@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // shortId 유효성 검사
     if (!shortId || typeof shortId !== 'string') {
         return {
-            title: '일정표 입장',
-            description: '스마트한 일정표에서 정산 휴무 공지를 확인하세요.',
+            title: '용카팀 일정표 입장',
+            description: '용카팀에서 제공하는 스마트 일정 관리 서비스에 입장하세요.',
             icons: {
                 icon: '/logo512.png',
                 shortcut: '/logo512.png',
@@ -38,23 +38,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
             return {
                 metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
-                title: `${name} - 일정표 입장`,
-                description: '스마트한 일정표에서 정산 휴무 공지를 확인하세요.',
+                title: `${name} - 용카팀 일정표 입장`,
+                description: `${name} 팀의 일정표에 입장하세요. 용카팀에서 제공하는 스마트 일정 관리 서비스.`,
                 icons: {
                     icon: absoluteLogoUrl,
                     shortcut: absoluteLogoUrl,
                     apple: absoluteLogoUrl,
                 },
                 openGraph: {
-                    title: `${name} - 일정표 입장`,
-                    description: '스마트한 일정표에서 정산 휴무 공지를 확인하세요.',
+                    title: `${name} - 용카팀 일정표 입장`,
+                    description: `${name} 팀의 일정표에 입장하세요. 용카팀에서 제공하는 스마트 일정 관리 서비스.`,
                     images: [absoluteLogoUrl],
                     type: 'website',
                 },
                 twitter: {
                     card: 'summary',
-                    title: `${name} - 일정표 입장`,
-                    description: '스마트한 일정표에서 정산 휴무 공지를 확인하세요.',
+                    title: `${name} - 용카팀 일정표 입장`,
+                    description: `${name} 팀의 일정표에 입장하세요. 용카팀에서 제공하는 스마트 일정 관리 서비스.`,
                     images: [absoluteLogoUrl],
                 },
             };
@@ -66,16 +66,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // 기본 메타데이터
     return {
         metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
-        title: '일정표 입장',
-        description: '스마트한 일정표에서 정산 휴무 공지를 확인하세요.',
+        title: '용카팀 일정표 입장',
+        description: '용카팀에서 제공하는 스마트 일정 관리 서비스에 입장하세요.',
         icons: {
             icon: '/logo512.png',
             shortcut: '/logo512.png',
             apple: '/logo512.png',
         },
         openGraph: {
-            title: '일정표 입장',
-            description: '스마트한 일정표에서 정산 휴무 공지를 확인하세요.',
+            title: '용카팀 일정표 입장',
+            description: '용카팀에서 제공하는 스마트 일정 관리 서비스에 입장하세요.',
             images: ['/logo512.png'],
             type: 'website',
         },
