@@ -34,7 +34,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             const name = scheduleData.name || '일정표';
             const company = scheduleData.company || '';
             const logoUrl = company ? COMPANY_LOGOS[company] || '/logo512.png' : '/logo512.png';
-            const absoluteLogoUrl = logoUrl.startsWith('http') ? logoUrl : `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${logoUrl}`;
+
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+            const absoluteLogoUrl = logoUrl.startsWith('http') ? logoUrl : `${baseUrl}${logoUrl}`;
+
+            console.log(`[Metadata] Found schedule: ${name}, Company: ${company}, Logo: ${absoluteLogoUrl}`);
 
             return {
                 metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
@@ -58,9 +62,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
                     images: [absoluteLogoUrl],
                 },
             };
+        } else {
+            console.log(`[Metadata] No schedule found for shortId: ${shortId}`);
         }
     } catch (error) {
-        console.error('Error fetching schedule metadata:', error);
+        console.error('[Metadata] Error fetching schedule metadata:', error);
     }
 
     // 기본 메타데이터
