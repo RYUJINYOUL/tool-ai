@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { X, Image as ImageIcon, Download, Type, Check, Loader2, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Image as ImageIcon, Download, Type, Check, Loader2, Sparkles, Maximize2, Minimize2, Save } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
+import { useUserStorage } from '@/hooks/useUserStorage';
+import { useAuth } from '@/context/auth-context';
 
 type BrandType = 'cj' | 'coupang' | 'logen' | 'lotte' | 'hanjin' | 'etc';
 
@@ -108,7 +110,10 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
     const [isDownloading, setIsDownloading] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [recruitData, setRecruitData] = useState<RecruitData | null>(null);
+    const [isSavingToStorage, setIsSavingToStorage] = useState(false);
     const previewRef = useRef<HTMLDivElement>(null);
+    const { uploadImage } = useUserStorage();
+    const { isLoggedIn } = useAuth();
 
     const activeBrand = BRANDS[selectedBrand];
 
@@ -166,6 +171,31 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
             alert('이미지 생성 중 오류가 발생했습니다.');
         } finally {
             setIsDownloading(false);
+        }
+    };
+
+    const handleSaveToStorage = async () => {
+        if (!previewRef.current || !isLoggedIn) return;
+
+        setIsSavingToStorage(true);
+        try {
+            const dataUrl = await domToPng(previewRef.current, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+            });
+
+            // Data URL to Blob
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            const file = new File([blob], `구인광고_${activeBrand.name}_${Date.now()}.png`, { type: 'image/png' });
+
+            await uploadImage(file);
+            alert('저장파일 탭에 성공적으로 저장되었습니다!');
+        } catch (error) {
+            console.error('Save to storage error:', error);
+            alert('저장 중 오류가 발생했습니다.');
+        } finally {
+            setIsSavingToStorage(false);
         }
     };
 
@@ -272,24 +302,39 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
                         )}
                     </div>
 
-                    <div className="p-6 border-t border-gray-100 bg-white shadow-lg">
+                    <div className="p-6 border-t border-gray-100 bg-white shadow-lg flex gap-3">
                         <button
                             onClick={handleDownload}
-                            disabled={isDownloading || !recruitData}
-                            className="w-full py-4 bg-[#1a1a1a] hover:bg-black disabled:bg-gray-300 text-white rounded-2xl font-bold flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-xl shadow-gray-200"
+                            disabled={isDownloading || isSavingToStorage || !recruitData}
+                            className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                         >
                             {isDownloading ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    <span>이미지 만드는 중...</span>
-                                </>
+                                <Loader2 className="w-5 h-5 animate-spin" />
                             ) : (
-                                <>
-                                    <Download className="w-5 h-5" />
-                                    <span>PNG 이미지로 저장하기</span>
-                                </>
+                                <Download className="w-5 h-5" />
                             )}
+                            <span>이미지 다운로드</span>
                         </button>
+
+                        {isLoggedIn && (
+                            <button
+                                onClick={handleSaveToStorage}
+                                disabled={isDownloading || isSavingToStorage || !recruitData}
+                                className="flex-[2] py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-2xl font-bold flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-xl shadow-blue-100"
+                            >
+                                {isSavingToStorage ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <span>저장 중...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="w-5 h-5" />
+                                        <span>내 저장공간에 저장하기</span>
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
 

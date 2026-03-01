@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { X, Sparkles, Copy, Check, Loader2, Save } from 'lucide-react';
+import { useUserStorage } from '@/hooks/useUserStorage';
+import { useAuth } from '@/context/auth-context';
 
 interface RecruitData {
     courier: string;
@@ -29,6 +31,10 @@ export default function RecruitOrganizerModal({ isOpen, onClose }: RecruitOrgani
     const [isLoading, setIsLoading] = useState(false);
     const [resultData, setResultData] = useState<RecruitData | null>(null);
     const [isCopied, setIsCopied] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const { saveText } = useUserStorage();
+    const { isLoggedIn } = useAuth();
 
     if (!isOpen) return null;
 
@@ -82,6 +88,39 @@ ${resultData.description}
         navigator.clipboard.writeText(text);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
+    };
+
+    const handleSaveToStorage = async () => {
+        if (!resultData || !isLoggedIn) return;
+
+        setIsSaving(true);
+        try {
+            const text = `
+[AI 정리 결과]
+□ 택배사명 : ${resultData.courier}
+□ 배송지 주소 : ${resultData.delivery_address}
+□ 터미널 주소 : ${resultData.terminal_address}
+□ 배송 비율 : ${resultData.delivery_ratio}
+□ 매출 / 수익 : ${resultData.income}
+□ 분류도우미 : ${resultData.sorting_helper}
+□ 근무시간 : ${resultData.working_hours}
+□ 대리점명 : ${resultData.agency}
+□ 화물운송자격증 : ${resultData.license}
+□ 모집마감 : ${resultData.deadline}
+□ 연락처 : ${resultData.contact}
+
+□ 상세설명
+${resultData.description}
+            `.trim();
+
+            await saveText(text);
+            alert('저장파일 탭에 메모로 저장되었습니다!');
+        } catch (error) {
+            console.error('Save error:', error);
+            alert('저장 중 오류가 발생했습니다.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleChange = (field: keyof RecruitData, value: string) => {
@@ -142,11 +181,11 @@ ${resultData.description}
                             <div className="grid grid-cols-1 gap-4">
                                 {[
                                     { field: 'courier', label: '택배사명', icon: '🚚' },
-                                    { field: 'delivery_address', label: '배송지 주소', icon: '�' },
+                                    { field: 'delivery_address', label: '배송지 주소', icon: '' },
                                     { field: 'terminal_address', label: '터미널 주소', icon: '🏢' },
-                                    { field: 'delivery_ratio', label: '배송 비율', icon: '�' },
+                                    { field: 'delivery_ratio', label: '배송 비율', icon: '' },
                                     { field: 'income', label: '매출 / 수익', icon: '💰' },
-                                    { field: 'sorting_helper', label: '분류도우미', icon: '�' },
+                                    { field: 'sorting_helper', label: '분류도우미', icon: '' },
                                     { field: 'working_hours', label: '근무시간', icon: '🕒' },
                                     { field: 'agency', label: '대리점명', icon: '🏪' },
                                     { field: 'license', label: '화물운송자격증', icon: '📄' },
@@ -167,8 +206,8 @@ ${resultData.description}
                                                 value={resultData?.[item.field as keyof RecruitData] || ''}
                                                 onChange={(e) => handleChange(item.field as keyof RecruitData, e.target.value)}
                                                 className={`w-full px-4 py-3 bg-white border rounded-xl outline-none transition-all font-medium text-gray-700 min-h-[100px] ${!resultData?.[item.field as keyof RecruitData]
-                                                        ? 'border-red-100 bg-red-50/20 focus:border-red-400 focus:ring-4 focus:ring-red-100'
-                                                        : 'border-gray-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
+                                                    ? 'border-red-100 bg-red-50/20 focus:border-red-400 focus:ring-4 focus:ring-red-100'
+                                                    : 'border-gray-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
                                                     }`}
                                                 placeholder={`${item.label} 정보를 입력해주세요`}
                                             />
@@ -178,8 +217,8 @@ ${resultData.description}
                                                 value={resultData?.[item.field as keyof RecruitData] || ''}
                                                 onChange={(e) => handleChange(item.field as keyof RecruitData, e.target.value)}
                                                 className={`w-full px-4 py-3 bg-white border rounded-xl outline-none transition-all font-medium text-gray-700 ${!resultData?.[item.field as keyof RecruitData]
-                                                        ? 'border-red-100 bg-red-50/20 focus:border-red-400 focus:ring-4 focus:ring-red-100'
-                                                        : 'border-gray-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
+                                                    ? 'border-red-100 bg-red-50/20 focus:border-red-400 focus:ring-4 focus:ring-red-100'
+                                                    : 'border-gray-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-100'
                                                     }`}
                                                 placeholder={`${item.label} 정보를 입력해주세요`}
                                             />
@@ -197,20 +236,35 @@ ${resultData.description}
                                 </button>
                                 <button
                                     onClick={handleCopy}
-                                    className="flex-[2] py-4 bg-[#1a1a1a] hover:bg-black text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-gray-200 transition-all active:scale-[0.98]"
+                                    className="flex-1 py-4 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                                 >
                                     {isCopied ? (
                                         <>
-                                            <Check className="w-5 h-5" />
+                                            <Check className="w-5 h-5 text-green-500" />
                                             <span>복사 완료!</span>
                                         </>
                                     ) : (
                                         <>
                                             <Copy className="w-5 h-5" />
-                                            <span>정리 결과 복사하기</span>
+                                            <span>결과 복사</span>
                                         </>
                                     )}
                                 </button>
+
+                                {isLoggedIn && (
+                                    <button
+                                        onClick={handleSaveToStorage}
+                                        disabled={isSaving}
+                                        className="flex-[2] py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-blue-100 transition-all active:scale-[0.98]"
+                                    >
+                                        {isSaving ? (
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <Save className="w-5 h-5" />
+                                        )}
+                                        <span>내 저장공간에 저장하기</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

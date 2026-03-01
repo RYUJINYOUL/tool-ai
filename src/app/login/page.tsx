@@ -11,6 +11,7 @@ import {
     signInWithPopup
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { X } from 'lucide-react';
 
 declare global {
     interface Window {
@@ -25,6 +26,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
     const router = useRouter();
 
     // Redirect if already logged in
@@ -215,6 +217,13 @@ export default function LoginPage() {
                         >
                             {isLoading ? '로그인 중...' : '로그인'}
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsSignupModalOpen(true)}
+                            className="w-full py-4 rounded-xl text-[#3b82f6] font-bold text-lg border-2 border-[#3b82f6] hover:bg-blue-50 transition-all duration-300"
+                        >
+                            회원가입
+                        </button>
                     </form>
 
                     {activeTab === 'personal' && (
@@ -258,6 +267,75 @@ export default function LoginPage() {
                     )}
                 </div>
             </div>
+
+            {/* Signup Modal */}
+            {isSignupModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div
+                        className="bg-white w-full max-w-[420px] rounded-[32px] shadow-2xl overflow-hidden animate-scale-up border border-white/20"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-2xl font-black text-gray-900 tracking-tight">회원가입</h3>
+                                <button
+                                    onClick={() => setIsSignupModalOpen(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                >
+                                    <X className="w-6 h-6 text-gray-400" />
+                                </button>
+                            </div>
+
+                            <div className="bg-blue-50 p-6 rounded-2xl mb-8 border border-blue-100">
+                                <div className="text-blue-600 font-bold text-lg text-center leading-relaxed">
+                                    회원가입은 앱에서만 지원합니다.
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <a
+                                    href="https://play.google.com/store/apps/details?id=com.yongcar.app&pcampaignid=web_share"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-4 w-full p-5 bg-white border-2 border-gray-100 rounded-2xl hover:border-blue-500 hover:shadow-lg transition-all duration-300 group"
+                                >
+                                    <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-blue-50 transition-colors">
+                                        <img src="/google_logo.png" className="w-8 h-8 object-contain" alt="Play Store" />
+                                    </div>
+                                    <div className="flex flex-col items-start">
+                                        <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">GET IT ON</span>
+                                        <span className="text-gray-900 text-lg font-extrabold">Google Play</span>
+                                    </div>
+                                </a>
+
+                                <a
+                                    href="https://apps.apple.com/kr/app/%EC%9A%A9%EC%B9%B4/id6758199533"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-4 w-full p-5 bg-white border-2 border-gray-100 rounded-2xl hover:border-[#1a1a1a] hover:shadow-lg transition-all duration-300 group"
+                                >
+                                    <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-gray-100 transition-colors">
+                                        <img src="/apple.png" className="w-8 h-8 object-contain" alt="App Store" />
+                                    </div>
+                                    <div className="flex flex-col items-start">
+                                        <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Download on the</span>
+                                        <span className="text-gray-900 text-lg font-extrabold">App Store</span>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 p-4 border-t border-gray-100">
+                            <button
+                                onClick={() => setIsSignupModalOpen(false)}
+                                className="w-full py-3 text-gray-500 font-bold hover:text-gray-700 transition-colors"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

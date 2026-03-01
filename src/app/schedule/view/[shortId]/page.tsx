@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import Head from 'next/head';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
 import { Share2, Settings, Phone, ClipboardList } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { COMPANY_LOGOS } from '@/lib/constants';
 
 async function sha256(msg: string) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
@@ -43,7 +45,7 @@ export default function ScheduleViewPage() {
     const { shortId } = useParams<{ shortId: string }>();
     const searchParams = useSearchParams();
     const scheduleName = searchParams.get('name') ?? '일정표';
-    const { user } = useAuth();
+    const { user, firebaseUser, loading: authLoading } = useAuth();
     const router = useRouter();
 
     // state
@@ -54,6 +56,16 @@ export default function ScheduleViewPage() {
     const [notices, setNotices] = useState<Notice[]>([]);
     const [communications, setCommunications] = useState<Communication[]>([]);
     const [loading, setLoading] = useState(true);
+    const [scheduleData, setScheduleData] = useState<{name: string, company: string}>({name: '', company: ''});
+
+    // Update isAdmin status when auth or docId changes
+    useEffect(() => {
+        if (firebaseUser && docId) {
+            setIsAdmin(firebaseUser.uid === docId);
+        } else {
+            setIsAdmin(false);
+        }
+    }, [firebaseUser, docId]);
 
     // UI state
     const [focusedDate, setFocusedDate] = useState(new Date());
@@ -78,6 +90,42 @@ export default function ScheduleViewPage() {
     const [adminPwError, setAdminPwError] = useState('');
     const [settlementMsg, setSettlementMsg] = useState('');
 
+    // ── Update metadata ──────────────────────────────────────────────────────────
+    const updateMetadata = (name: string, company: string) => {
+        // Update document title
+        document.title = `${name} - 용카팀 일정표`;
+        
+        // Update favicon
+        const favicon = document.querySelector("link[rel='icon']") as HTMLLinkElement;
+        if (favicon) {
+            favicon.href = COMPANY_LOGOS[company] || '/logo512.png';
+        }
+        
+        // Update meta description
+        let metaDescription = document.querySelector("meta[name='description']") as HTMLMetaElement;
+        if (!metaDescription) {
+            metaDescription = document.createElement('meta');
+            metaDescription.name = 'description';
+            document.head.appendChild(metaDescription);
+        }
+        metaDescription.content = `${name} 팀의 일정표입니다. 용카팀에서 제공하는 스마트 일정 관리 서비스.`;
+        
+        // Update Open Graph meta tags
+        const updateOGMeta = (property: string, content: string) => {
+            let meta = document.querySelector(`meta[property='${property}']`) as HTMLMetaElement;
+            if (!meta) {
+                meta = document.createElement('meta');
+                meta.setAttribute('property', property);
+                document.head.appendChild(meta);
+            }
+            meta.content = content;
+        };
+        
+        updateOGMeta('og:title', `${name} - 용카팀 일정표`);
+        updateOGMeta('og:description', `${name} 팀의 일정표입니다. 용카팀에서 제공하는 스마트 일정 관리 서비스.`);
+        updateOGMeta('og:image', COMPANY_LOGOS[company] || '/logo512.png');
+    };
+
     // ── Load schedule data ───────────────────────────────────────────────────────
     useEffect(() => {
         const q = query(collection(db, 'schedules'), where('shortId', '==', shortId), limit(1));
@@ -86,7 +134,7 @@ export default function ScheduleViewPage() {
             const d = snap.docs[0];
             const data = d.data();
             setDocId(d.id);
-            setIsAdmin(!!user && user.uid === d.id);
+            setScheduleData({name: data.name || '', company: data.company || ''});
             setMembers(data.members ?? []);
             setNotices(data.notices ?? []);
             setCommunications(data.communications ?? []);
@@ -97,10 +145,16 @@ export default function ScheduleViewPage() {
                 parsed[k] = new Set(v as string[]);
             }
             setDayOffs(parsed);
+            
+            // Update metadata with schedule info
+            if (data.name && data.company) {
+                updateMetadata(data.name, data.company);
+            }
+            
             setLoading(false);
         });
         return () => unsub();
-    }, [shortId, user]);
+    }, [shortId]);
 
     // ── Firestore helpers ────────────────────────────────────────────────────────
     const saveField = async (field: string, value: unknown) => {
@@ -320,9 +374,11 @@ export default function ScheduleViewPage() {
     };
 
     const removeMember = async (name: string) => {
-        const updated = members.filter(m => m.name !== name);
-        setMembers(updated);
-        await saveField('members', updated);
+        if (confirm(`${name} 팀원을 삭제하시겠습니까?`)) {
+            const updated = members.filter(m => m.name !== name);
+            setMembers(updated);
+            await saveField('members', updated);
+        }
     };
 
     // ── Notice management ────────────────────────────────────────────────────────
@@ -396,7 +452,7 @@ export default function ScheduleViewPage() {
                 <div
                     key={i}
                     onClick={() => valid && isAdmin && setDayOffDialog(dateKey)}
-                    className={`border rounded-lg m-0.5 flex flex-col min-h-[90px] cursor-pointer
+                    className={`border rounded-lg m-0.5 flex flex-col min-h-[120px] cursor-pointer
             ${valid ? 'bg-white hover:bg-blue-50' : 'bg-gray-50'}
             ${highlighted ? 'bg-blue-50 border-blue-200' : 'border-gray-100'}
             ${isAdmin && valid ? 'cursor-pointer' : ''}
@@ -433,11 +489,29 @@ export default function ScheduleViewPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f8faff] flex flex-col">
+        <>
+            <Head>
+                <title>{scheduleData.name ? `${scheduleData.name} - 용카팀 일정표` : scheduleName}</title>
+                <meta name="description" content={scheduleData.name ? `${scheduleData.name} 팀의 일정표입니다. 용카팀에서 제공하는 스마트 일정 관리 서비스.` : '용카팀에서 제공하는 스마트 일정 관리 서비스입니다.'} />
+                <meta property="og:title" content={scheduleData.name ? `${scheduleData.name} - 용카팀 일정표` : scheduleName} />
+                <meta property="og:description" content={scheduleData.name ? `${scheduleData.name} 팀의 일정표입니다. 용카팀에서 제공하는 스마트 일정 관리 서비스.` : '용카팀에서 제공하는 스마트 일정 관리 서비스입니다.'} />
+                <meta property="og:image" content={scheduleData.company ? COMPANY_LOGOS[scheduleData.company] || '/logo512.png' : '/logo512.png'} />
+                <link rel="icon" href={scheduleData.company ? COMPANY_LOGOS[scheduleData.company] || '/logo512.png' : '/logo512.png'} />
+            </Head>
+            <div className="min-h-screen bg-[#f8faff] flex flex-col">
             {/* AppBar */}
             <header className="bg-[#42A5F5] text-white flex items-center px-4 h-14 flex-shrink-0 gap-3">
                 <button onClick={() => history.back()} className="text-white text-xl">←</button>
-                <span className="font-bold flex-1 truncate">{scheduleName}</span>
+                {scheduleData.company && (
+                    <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center overflow-hidden border border-gray-100 shrink-0">
+                        <img
+                            src={COMPANY_LOGOS[scheduleData.company] || '/logo512.png'}
+                            alt={scheduleData.company}
+                            className="w-full h-full object-contain p-0.5"
+                        />
+                    </div>
+                )}
+                <span className="font-bold flex-1 truncate">{scheduleData.name || scheduleName}</span>
                 {isAdmin && (
                     <>
                         <span className="text-xs bg-white/20 px-2 py-1 rounded-full">관리자</span>
@@ -458,20 +532,26 @@ export default function ScheduleViewPage() {
             {/* Outer Tabs */}
             <div className="bg-[#42A5F5] px-4 pb-2 flex-shrink-0">
                 <div className="flex gap-1">
-                    {(['month', 'week', 'team'] as const).map(t => (
-                        <button key={t} onClick={() => setOuterTab(t)}
-                            className={`flex-1 py-1.5 text-sm font-bold transition-all ${outerTab === t
-                                ? 'text-white relative after:absolute after:bottom-0 after:left-1/4 after:w-1/2 after:h-[2px] after:bg-white after:rounded-full'
-                                : 'text-white/60'
-                                }`}
-                            style={{ position: 'relative' }}
-                        >
-                            {t === 'month' ? '월' : t === 'week' ? '주' : '팀원'}
-                            {outerTab === t && (
-                                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-white rounded-full" />
-                            )}
-                        </button>
-                    ))}
+                    {(['month', 'week', 'team'] as const).map(t => {
+                        const text = t === 'month' ? '월' : t === 'week' ? '주' : '팀원';
+                        return (
+                            <button key={t} onClick={() => setOuterTab(t)}
+                                className={`flex-1 py-3 text-base font-bold transition-all ${outerTab === t
+                                    ? 'text-white relative'
+                                    : 'text-white/60'
+                                    }`}
+                                style={{ position: 'relative' }}
+                            >
+                                {text}
+                                {outerTab === t && (
+                                    <span 
+                                        className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-white rounded-full" 
+                                        style={{ width: `${text.length * 0.8}em` }}
+                                    />
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -480,21 +560,21 @@ export default function ScheduleViewPage() {
                     {/* Desktop: split layout | Mobile: stack + bottom sheet */}
                     <div className="flex-1 flex overflow-hidden">
                         {/* Desktop Layout */}
-                        <div className="hidden md:flex flex-1 p-6 gap-6">
+                        <div className="hidden md:flex flex-1 p-6 gap-4">
                             {/* Calendar */}
-                            <div className="w-[58%] bg-white rounded-2xl p-5 shadow-sm border border-gray-100 overflow-y-auto">
+                            <div className="w-[75%] bg-white rounded-2xl p-5 shadow-sm border border-gray-100 overflow-y-auto min-h-[600px]">
                                 <CalendarHeader />
                                 <WeekdayHeader />
                                 <CalendarGrid />
                             </div>
                             {/* Side Panel */}
-                            <div className="flex-1 flex flex-col gap-4">
+                            <div className="w-[25%] flex flex-col gap-4">
                                 <div className="flex bg-gray-100 p-1 rounded-2xl">
                                     {(['team', 'notice', 'comm'] as const).map(t => (
                                         <button
                                             key={t}
                                             onClick={() => setInnerTab(t)}
-                                            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-200 ${innerTab === t ? 'bg-[#42A5F5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-200 ${innerTab === t ? 'bg-[#42A5F5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
                                                 }`}
                                         >
                                             {t === 'team' ? '팀원' : t === 'notice' ? '공지' : '소통'}
@@ -645,26 +725,23 @@ export default function ScheduleViewPage() {
                         </div>
 
                         {/* Mobile Layout */}
-                        <div className="md:hidden flex-1 relative overflow-hidden">
-                            {/* Calendar scrollable behind */}
-                            <div className="absolute inset-0 overflow-y-auto pb-72 px-3 pt-2">
+                        <div className="md:hidden flex-1 flex flex-col">
+                            {/* Calendar Section */}
+                            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4 min-h-[500px]">
                                 <CalendarHeader />
                                 <WeekdayHeader />
                                 <CalendarGrid />
                             </div>
-                            {/* Bottom sheet */}
-                            <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl border-t border-gray-100"
-                                style={{ maxHeight: '60%', minHeight: '200px' }}>
-                                <div className="flex justify-center py-3">
-                                    <div className="w-10 h-1 bg-gray-200 rounded-full" />
-                                </div>
-                                <div className="px-4 pb-3">
+                            
+                            {/* Bottom Tabs Section */}
+                            <div className="bg-white border-t border-gray-200 shadow-lg">
+                                <div className="px-4 py-3">
                                     <div className="flex bg-gray-100 p-1 rounded-2xl">
                                         {(['team', 'notice', 'comm'] as const).map(t => (
                                             <button
                                                 key={t}
                                                 onClick={() => setInnerTab(t)}
-                                                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-200 ${innerTab === t ? 'bg-[#42A5F5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                                className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-200 ${innerTab === t ? 'bg-[#42A5F5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
                                                     }`}
                                             >
                                                 {t === 'team' ? '팀원' : t === 'notice' ? '공지' : '소통'}
@@ -672,7 +749,7 @@ export default function ScheduleViewPage() {
                                         ))}
                                     </div>
                                 </div>
-                                <div className="px-4 pb-6 overflow-y-auto" style={{ maxHeight: 'calc(60vh - 110px)' }}>
+                                <div className="px-4 pb-4 max-h-64 overflow-y-auto">
                                     {innerTab === 'team' && (
                                         <div className="h-full overflow-y-auto">
                                             {isAdmin && (
@@ -833,7 +910,7 @@ export default function ScheduleViewPage() {
                     </div>
 
                     {/* Week Grid */}
-                    <div className="flex flex-1 gap-2 max-w-5xl mx-auto w-full min-h-[400px]">
+                    <div className="flex flex-1 gap-2 max-w-5xl mx-auto w-full min-h-[500px]">
                         {Array.from({ length: 7 }).map((_, i) => {
                             const date = new Date(startOfWeek);
                             date.setDate(date.getDate() + i);
@@ -1116,6 +1193,7 @@ export default function ScheduleViewPage() {
                     </div>
                 </div>
             )}
-        </div>
+            </div>
+        </>
     );
 }

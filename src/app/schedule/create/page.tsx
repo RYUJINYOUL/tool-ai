@@ -25,8 +25,15 @@ function generateShortId(length = 6) {
 }
 
 export default function ScheduleCreatePage() {
-    const { user, isLoggedIn } = useAuth();
+    const { user, firebaseUser, isLoggedIn, loading } = useAuth();
     const router = useRouter();
+
+    // Redirect if not logged in
+    React.useEffect(() => {
+        if (!loading && !isLoggedIn) {
+            router.replace('/login?redirect=/schedule/create');
+        }
+    }, [isLoggedIn, loading, router]);
 
     const [selectedCompany, setSelectedCompany] = useState('coupang');
     const [name, setName] = useState('');
@@ -48,7 +55,8 @@ export default function ScheduleCreatePage() {
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!validate()) return;
-        if (!isLoggedIn || !user) {
+
+        if (!isLoggedIn || !firebaseUser) {
             setErrors({ global: '로그인이 필요합니다.' });
             return;
         }
@@ -56,7 +64,7 @@ export default function ScheduleCreatePage() {
         setIsLoading(true);
         try {
             // Check if schedule already exists
-            const existing = await getDoc(doc(db, 'schedules', user.uid));
+            const existing = await getDoc(doc(db, 'schedules', firebaseUser.uid));
             if (existing.exists()) {
                 setErrors({ global: '이미 일정표가 존재합니다. 사용자당 하나의 일정표만 만들 수 있습니다.' });
                 return;
@@ -74,10 +82,12 @@ export default function ScheduleCreatePage() {
             const hashedPassword = await sha256(password);
             const company = COMPANIES.find(c => c.value === selectedCompany)!;
 
-            await setDoc(doc(db, 'schedules', user.uid), {
+            await setDoc(doc(db, 'schedules', firebaseUser.uid), {
                 name: name.trim(),
                 company: selectedCompany,
                 coverImagePath: `assets/images/${selectedCompany}.png`,
+                userId: firebaseUser.uid,
+                email: firebaseUser.email,
                 password: hashedPassword,
                 shortId,
                 createdAt: new Date(),

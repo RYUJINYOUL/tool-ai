@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Map as MapIcon, Save, Trash2, Undo2, MousePointer2, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Map as MapIcon, Save, Trash2, Undo2, MousePointer2, Maximize2, Minimize2, Download } from 'lucide-react';
+import { domToPng } from 'modern-screenshot';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
+import { useUserStorage } from '@/hooks/useUserStorage';
 
 declare global {
     interface Window {
@@ -18,11 +20,13 @@ interface RouteMapModalProps {
 }
 
 export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
-    const { user } = useAuth();
+    const { firebaseUser, isLoggedIn } = useAuth();
     const [mapLoaded, setMapLoaded] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [routeName, setRouteName] = useState('');
+    const [isCapturing, setIsCapturing] = useState(false);
+    const { uploadImage } = useUserStorage();
     const mapContainer = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
     const polygonInstance = useRef<any>(null);
@@ -189,7 +193,7 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
     };
 
     const handleSave = async () => {
-        if (!user) {
+        if (!isLoggedIn || !firebaseUser) {
             alert('로그인이 필요한 기능입니다.');
             return;
         }
@@ -205,15 +209,86 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
         }
 
         setIsSaving(true);
+        setIsCapturing(true);
+
         try {
+            // 1. 지도 안정화 대기
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // 2. 화상 캡쳐 (지도 영역)
+            if (mapContainer.current) {
+                try {
+                    // CORS 문제 해결을 위해 이미지 태그들을 프록시 URL로 교체
+                    const imgs = mapContainer.current.querySelectorAll('img');
+                    const originalSrcs = new Map<HTMLImageElement, string>();
+
+                    // 모든 이미지를 프록시를 통해 다시 로드 시도
+                    const loadPromises = Array.from(imgs).map(img => {
+                        return new Promise((resolve) => {
+                            const src = img.src;
+                            if (src.startsWith('http') && (src.includes('kakaocdn.net') || src.includes('daumcdn.net'))) {
+                                originalSrcs.set(img, src);
+
+                                // 프록시 URL 설정
+                                const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(src)}`;
+
+                                const newImg = new Image();
+                                newImg.crossOrigin = 'anonymous';
+                                newImg.onload = () => {
+                                    img.src = proxyUrl;
+                                    resolve(null);
+                                };
+                                newImg.onerror = () => resolve(null); // 에러나도 진행
+                                newImg.src = proxyUrl;
+                            } else {
+                                resolve(null);
+                            }
+                        });
+                    });
+
+                    // 모든 이미지 프록시 로드 대기
+                    await Promise.all(loadPromises);
+                    // 스크립트 실행 환경 안정을 위해 짧은 대기
+                    await new Promise(r => setTimeout(r, 200));
+
+                    const dataUrl = await domToPng(mapContainer.current, {
+                        scale: 1,
+                        backgroundColor: '#ffffff',
+                    });
+
+                    // 컴퓨터에 직접 다운로드 트리거
+                    const link = document.createElement('a');
+                    link.download = `라우트지도_${routeName.trim()}_${Date.now()}.png`;
+                    link.href = dataUrl;
+                    link.click();
+
+                    // Storage 업로드를 위한 파일 변환
+                    const res = await fetch(dataUrl);
+                    const blob = await res.blob();
+                    const file = new File([blob], `route_map_${Date.now()}.png`, { type: 'image/png' });
+
+                    // 3. 저장파일(Storage) 탭에 이미지로 저장
+                    await uploadImage(file);
+
+                    // 이미지 원복 (UI 유지용)
+                    originalSrcs.forEach((src, img) => {
+                        img.src = src;
+                    });
+                } catch (captureErr) {
+                    console.error("Map capture failed:", captureErr);
+                    alert('지도를 이미지로 변환하는 데 실패했습니다. 데이터만 저장합니다.');
+                }
+            }
+
+            // 4. Firestore 데이터 저장
             await addDoc(collection(db, 'routeMaps'), {
-                userId: user.uid,
+                userId: firebaseUser.uid,
                 name: routeName.trim(),
                 points: points,
                 createdAt: serverTimestamp()
             });
 
-            alert('라우트 지도가 저장되었습니다.');
+            alert('저장이 완료되었습니다! (저장파일 탭 확인)');
             setPoints([]);
             setRouteName('');
             onClose();
@@ -222,6 +297,7 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
             alert('저장 중 오류가 발생했습니다.');
         } finally {
             setIsSaving(false);
+            setIsCapturing(false);
         }
     };
 
@@ -307,11 +383,20 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
                                 />
                                 <button
                                     onClick={handleSave}
-                                    disabled={isSaving || points.length < 3}
+                                    disabled={isSaving || isCapturing || points.length < 3}
                                     className="px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-orange-100"
                                 >
-                                    <Save className="w-4 h-4" />
-                                    <span>{isSaving ? '저장 중...' : '저장'}</span>
+                                    {isSaving || isCapturing ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <span>처리 중...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="w-4 h-4" />
+                                            <span>저장</span>
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>
