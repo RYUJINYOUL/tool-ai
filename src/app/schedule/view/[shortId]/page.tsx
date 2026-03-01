@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import Head from 'next/head';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -76,6 +75,7 @@ export default function ScheduleViewPage() {
     // Dialog state
     const [dayOffDialog, setDayOffDialog] = useState<string | null>(null); // date key
     const [newNotice, setNewNotice] = useState('');
+    const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
     const [newComm, setNewComm] = useState('');
     const [addMemberModal, setAddMemberModal] = useState(false);
     const [newMemberName, setNewMemberName] = useState('');
@@ -90,41 +90,6 @@ export default function ScheduleViewPage() {
     const [adminPwError, setAdminPwError] = useState('');
     const [settlementMsg, setSettlementMsg] = useState('');
 
-    // ── Update metadata ──────────────────────────────────────────────────────────
-    const updateMetadata = (name: string, company: string) => {
-        // Update document title
-        document.title = `${name} - 용카팀 일정표`;
-        
-        // Update favicon
-        const favicon = document.querySelector("link[rel='icon']") as HTMLLinkElement;
-        if (favicon) {
-            favicon.href = COMPANY_LOGOS[company] || '/logo512.png';
-        }
-        
-        // Update meta description
-        let metaDescription = document.querySelector("meta[name='description']") as HTMLMetaElement;
-        if (!metaDescription) {
-            metaDescription = document.createElement('meta');
-            metaDescription.name = 'description';
-            document.head.appendChild(metaDescription);
-        }
-        metaDescription.content = `${name} 팀의 일정표입니다. 용카팀에서 제공하는 스마트 일정 관리 서비스.`;
-        
-        // Update Open Graph meta tags
-        const updateOGMeta = (property: string, content: string) => {
-            let meta = document.querySelector(`meta[property='${property}']`) as HTMLMetaElement;
-            if (!meta) {
-                meta = document.createElement('meta');
-                meta.setAttribute('property', property);
-                document.head.appendChild(meta);
-            }
-            meta.content = content;
-        };
-        
-        updateOGMeta('og:title', `${name} - 용카팀 일정표`);
-        updateOGMeta('og:description', `${name} 팀의 일정표입니다. 용카팀에서 제공하는 스마트 일정 관리 서비스.`);
-        updateOGMeta('og:image', COMPANY_LOGOS[company] || '/logo512.png');
-    };
 
     // ── Load schedule data ───────────────────────────────────────────────────────
     useEffect(() => {
@@ -145,11 +110,6 @@ export default function ScheduleViewPage() {
                 parsed[k] = new Set(v as string[]);
             }
             setDayOffs(parsed);
-            
-            // Update metadata with schedule info
-            if (data.name && data.company) {
-                updateMetadata(data.name, data.company);
-            }
             
             setLoading(false);
         });
@@ -392,9 +352,11 @@ export default function ScheduleViewPage() {
     };
 
     const removeNotice = async (idx: number) => {
-        const updated = notices.filter((_, i) => i !== idx);
-        setNotices(updated);
-        await saveField('notices', updated);
+        if (confirm('이 공지사항을 삭제하시겠습니까?')) {
+            const updated = notices.filter((_, i) => i !== idx);
+            setNotices(updated);
+            await saveField('notices', updated);
+        }
     };
 
     // ── Communication management ─────────────────────────────────────────────────
@@ -489,16 +451,7 @@ export default function ScheduleViewPage() {
     }
 
     return (
-        <>
-            <Head>
-                <title>{scheduleData.name ? `${scheduleData.name} - 용카팀 일정표` : scheduleName}</title>
-                <meta name="description" content={scheduleData.name ? `${scheduleData.name} 팀의 일정표입니다. 용카팀에서 제공하는 스마트 일정 관리 서비스.` : '용카팀에서 제공하는 스마트 일정 관리 서비스입니다.'} />
-                <meta property="og:title" content={scheduleData.name ? `${scheduleData.name} - 용카팀 일정표` : scheduleName} />
-                <meta property="og:description" content={scheduleData.name ? `${scheduleData.name} 팀의 일정표입니다. 용카팀에서 제공하는 스마트 일정 관리 서비스.` : '용카팀에서 제공하는 스마트 일정 관리 서비스입니다.'} />
-                <meta property="og:image" content={scheduleData.company ? COMPANY_LOGOS[scheduleData.company] || '/logo512.png' : '/logo512.png'} />
-                <link rel="icon" href={scheduleData.company ? COMPANY_LOGOS[scheduleData.company] || '/logo512.png' : '/logo512.png'} />
-            </Head>
-            <div className="min-h-screen bg-[#f8faff] flex flex-col">
+        <div className="min-h-screen bg-[#f8faff] flex flex-col">
             {/* AppBar */}
             <header className="bg-[#42A5F5] text-white flex items-center px-4 h-14 flex-shrink-0 gap-3">
                 <button onClick={() => history.back()} className="text-white text-xl">←</button>
@@ -648,16 +601,21 @@ export default function ScheduleViewPage() {
                                     {innerTab === 'notice' && (
                                         <div className="h-full flex flex-col gap-3 overflow-hidden">
                                             {isAdmin && (
-                                                <div className="flex gap-2 flex-shrink-0">
-                                                    <input
-                                                        type="text"
+                                                <div className="flex flex-col gap-2 flex-shrink-0">
+                                                    <textarea
                                                         value={newNotice}
                                                         onChange={e => setNewNotice(e.target.value)}
-                                                        placeholder="공지사항 내용 입력"
-                                                        className="flex-1 input-field px-3 py-2 rounded-xl text-sm outline-none"
-                                                        onKeyDown={e => e.key === 'Enter' && addNotice()}
+                                                        placeholder="공지사항 내용 입력 (Ctrl+Enter로 등록)"
+                                                        className="w-full input-field px-3 py-3 rounded-xl text-sm outline-none resize-none"
+                                                        rows={3}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && e.ctrlKey) {
+                                                                e.preventDefault();
+                                                                addNotice();
+                                                            }
+                                                        }}
                                                     />
-                                                    <button onClick={addNotice} className="px-4 py-2 bg-[#42A5F5] text-white rounded-xl text-sm font-bold">등록</button>
+                                                    <button onClick={addNotice} className="self-end px-6 py-2 bg-[#42A5F5] text-white rounded-xl text-sm font-bold hover:bg-blue-600 transition-colors">등록</button>
                                                 </div>
                                             )}
                                             <div className="flex-1 overflow-y-auto pr-1">
@@ -667,14 +625,14 @@ export default function ScheduleViewPage() {
                                                         <p className="text-sm">공지사항이 없습니다.</p>
                                                     </div>
                                                 ) : notices.map((n, i) => (
-                                                    <div key={i} className="bg-white rounded-xl p-3 mb-3 border border-gray-100 flex items-start gap-3">
+                                                    <div key={i} className="bg-white rounded-xl p-3 mb-3 border border-gray-100 flex items-start gap-3 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setSelectedNotice(n)}>
                                                         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold flex-shrink-0 mt-0.5">{n.type}</span>
                                                         <div className="flex-1">
-                                                            <p className="text-sm text-gray-800">{n.title}</p>
+                                                            <p className="text-sm text-gray-800 overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{n.title}</p>
                                                             <p className="text-xs text-gray-400 mt-1">{n.date}</p>
                                                         </div>
                                                         {isAdmin && (
-                                                            <button onClick={() => removeNotice(i)} className="text-gray-300 hover:text-red-400">×</button>
+                                                            <button onClick={(e) => { e.stopPropagation(); removeNotice(i); }} className="text-gray-300 hover:text-red-400">×</button>
                                                         )}
                                                     </div>
                                                 ))}
@@ -816,16 +774,21 @@ export default function ScheduleViewPage() {
                                     {innerTab === 'notice' && (
                                         <div className="h-full flex flex-col gap-3 overflow-hidden">
                                             {isAdmin && (
-                                                <div className="flex gap-2 flex-shrink-0">
-                                                    <input
-                                                        type="text"
+                                                <div className="flex flex-col gap-2 flex-shrink-0">
+                                                    <textarea
                                                         value={newNotice}
                                                         onChange={e => setNewNotice(e.target.value)}
-                                                        placeholder="공지사항 내용 입력"
-                                                        className="flex-1 input-field px-3 py-2 rounded-xl text-sm outline-none"
-                                                        onKeyDown={e => e.key === 'Enter' && addNotice()}
+                                                        placeholder="공지사항 내용 입력 (Ctrl+Enter로 등록)"
+                                                        className="w-full input-field px-3 py-3 rounded-xl text-sm outline-none resize-none"
+                                                        rows={3}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && e.ctrlKey) {
+                                                                e.preventDefault();
+                                                                addNotice();
+                                                            }
+                                                        }}
                                                     />
-                                                    <button onClick={addNotice} className="px-4 py-2 bg-[#42A5F5] text-white rounded-xl text-sm font-bold">등록</button>
+                                                    <button onClick={addNotice} className="self-end px-6 py-2 bg-[#42A5F5] text-white rounded-xl text-sm font-bold hover:bg-blue-600 transition-colors">등록</button>
                                                 </div>
                                             )}
                                             <div className="flex-1 overflow-y-auto pr-1">
@@ -835,14 +798,14 @@ export default function ScheduleViewPage() {
                                                         <p className="text-sm">공지사항이 없습니다.</p>
                                                     </div>
                                                 ) : notices.map((n, i) => (
-                                                    <div key={i} className="bg-white rounded-xl p-3 mb-3 border border-gray-100 flex items-start gap-3">
+                                                    <div key={i} className="bg-white rounded-xl p-3 mb-3 border border-gray-100 flex items-start gap-3 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setSelectedNotice(n)}>
                                                         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold flex-shrink-0 mt-0.5">{n.type}</span>
                                                         <div className="flex-1">
-                                                            <p className="text-sm text-gray-800">{n.title}</p>
+                                                            <p className="text-sm text-gray-800 overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{n.title}</p>
                                                             <p className="text-xs text-gray-400 mt-1">{n.date}</p>
                                                         </div>
                                                         {isAdmin && (
-                                                            <button onClick={() => removeNotice(i)} className="text-gray-300 hover:text-red-400">×</button>
+                                                            <button onClick={(e) => { e.stopPropagation(); removeNotice(i); }} className="text-gray-300 hover:text-red-400">×</button>
                                                         )}
                                                     </div>
                                                 ))}
@@ -1193,7 +1156,30 @@ export default function ScheduleViewPage() {
                     </div>
                 </div>
             )}
-            </div>
-        </>
+
+            {/* 공지사항 상세 다이얼로그 */}
+            {selectedNotice && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedNotice(null)}>
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-bold">{selectedNotice.type}</span>
+                            <button onClick={() => setSelectedNotice(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+                        </div>
+                        <div className="mb-4">
+                            <p className="text-xs text-gray-400 mb-2">{selectedNotice.date}</p>
+                            <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                {selectedNotice.title}
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setSelectedNotice(null)}
+                            className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                        >
+                            닫기
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
