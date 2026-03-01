@@ -4,12 +4,12 @@ import { db } from '@/lib/firebase';
 import { COMPANY_LOGOS } from '@/lib/constants';
 
 interface Props {
-    params: { shortId: string };
+    params: Promise<{ shortId: string }>;
     children: React.ReactNode;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-    const { shortId } = params;
+    const { shortId } = await params;
     
     // shortId 유효성 검사
     if (!shortId || typeof shortId !== 'string') {
