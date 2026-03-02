@@ -3,6 +3,7 @@ export const COMPANY_LOGOS: Record<string, string> = {
     'cj': '/cj.png',
     'lotte': '/lot.png',
     'logen': '/log.png',
+    'hanjin': '/hanjin.png',
     'etc': '/logo512.png'
 };
 

@@ -1,7 +1,7 @@
 export interface Schedule {
   id: string; // userId와 동일
   name: string;
-  company: 'coupang' | 'cj' | 'lotte' | 'logen' | 'etc';
+  company: 'coupang' | 'cj' | 'lotte' | 'logen' | 'hanjin' | 'etc';
   coverImagePath: string;
   password?: string; // 해시된 비밀번호
   shortId: string; // 공유용 짧은 ID

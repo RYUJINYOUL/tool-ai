@@ -5,7 +5,7 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
-import { Share2, Settings, Phone, ClipboardList } from 'lucide-react';
+import { Share2, Settings, Phone, ClipboardList, ChevronDown, ChevronUp, MessageSquare, Megaphone, User } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { COMPANY_LOGOS } from '@/lib/constants';
 
@@ -55,7 +55,7 @@ export default function ScheduleViewPage() {
     const [notices, setNotices] = useState<Notice[]>([]);
     const [communications, setCommunications] = useState<Communication[]>([]);
     const [loading, setLoading] = useState(true);
-    const [scheduleData, setScheduleData] = useState<{name: string, company: string}>({name: '', company: ''});
+    const [scheduleData, setScheduleData] = useState<{ name: string, company: string }>({ name: '', company: '' });
 
     // Update isAdmin status when auth or docId changes
     useEffect(() => {
@@ -71,6 +71,8 @@ export default function ScheduleViewPage() {
     const [outerTab, setOuterTab] = useState<'month' | 'week' | 'team'>('month');
     const [innerTab, setInnerTab] = useState<'team' | 'notice' | 'comm'>('team');
     const [selectedMember, setSelectedMember] = useState<string | null>(null);
+    const [isMobilePanelExpanded, setIsMobilePanelExpanded] = useState(false);
+    const [isMobileMembersExpanded, setIsMobileMembersExpanded] = useState(false);
 
     // Dialog state
     const [dayOffDialog, setDayOffDialog] = useState<string | null>(null); // date key
@@ -99,7 +101,7 @@ export default function ScheduleViewPage() {
             const d = snap.docs[0];
             const data = d.data();
             setDocId(d.id);
-            setScheduleData({name: data.name || '', company: data.company || ''});
+            setScheduleData({ name: data.name || '', company: data.company || '' });
             setMembers(data.members ?? []);
             setNotices(data.notices ?? []);
             setCommunications(data.communications ?? []);
@@ -110,7 +112,7 @@ export default function ScheduleViewPage() {
                 parsed[k] = new Set(v as string[]);
             }
             setDayOffs(parsed);
-            
+
             setLoading(false);
         });
         return () => unsub();
@@ -497,8 +499,8 @@ export default function ScheduleViewPage() {
                             >
                                 {text}
                                 {outerTab === t && (
-                                    <span 
-                                        className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-white rounded-full" 
+                                    <span
+                                        className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 bg-white rounded-full"
                                         style={{ width: `${text.length * 0.8}em` }}
                                     />
                                 )}
@@ -684,173 +686,189 @@ export default function ScheduleViewPage() {
 
                         {/* Mobile Layout */}
                         <div className="md:hidden flex-1 flex flex-col">
-                            {/* Calendar Section */}
-                            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4 min-h-[500px]">
-                                <CalendarHeader />
-                                <WeekdayHeader />
-                                <CalendarGrid />
-                            </div>
-                            
-                            {/* Bottom Tabs Section */}
-                            <div className="bg-white border-t border-gray-200 shadow-lg">
-                                <div className="px-4 py-3">
-                                    <div className="flex bg-gray-100 p-1 rounded-2xl">
-                                        {(['team', 'notice', 'comm'] as const).map(t => (
-                                            <button
-                                                key={t}
-                                                onClick={() => setInnerTab(t)}
-                                                className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all duration-200 ${innerTab === t ? 'bg-[#42A5F5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                                                    }`}
-                                            >
-                                                {t === 'team' ? '팀원' : t === 'notice' ? '공지' : '소통'}
-                                            </button>
-                                        ))}
+                            {/* Toggleable Panel Containers above Calendar */}
+                            <div className="px-3 pt-3 flex flex-col gap-2.5">
+                                {/* Announcement/Communication Panel */}
+                                <div className="flex flex-col">
+                                    <button
+                                        onClick={() => {
+                                            setIsMobilePanelExpanded(!isMobilePanelExpanded);
+                                            if (!isMobilePanelExpanded) setIsMobileMembersExpanded(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between bg-white px-4 py-3.5 rounded-2xl border border-gray-100 shadow-sm active:scale-[0.98] transition-all ${isMobilePanelExpanded ? 'ring-2 ring-blue-100' : ''}`}
+                                    >
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#42A5F5]">
+                                                <Megaphone size={18} />
+                                            </div>
+                                            <span className="font-bold text-gray-700 text-sm">팀원 공지 소통</span>
+                                        </div>
+                                        <div className={`transition-transform duration-300 ${isMobilePanelExpanded ? 'rotate-180' : ''}`}>
+                                            <ChevronDown size={20} className="text-gray-400" />
+                                        </div>
+                                    </button>
+
+                                    <div
+                                        className={`overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out ${isMobilePanelExpanded ? 'max-h-[500px] opacity-100 mt-3' : 'max-h-0 opacity-0'
+                                            }`}
+                                    >
+                                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-4">
+                                            <div className="flex bg-gray-100 p-1 rounded-xl">
+                                                {(['notice', 'comm'] as const).map(t => (
+                                                    <button
+                                                        key={t}
+                                                        onClick={() => setInnerTab(t)}
+                                                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${innerTab === t ? 'bg-[#42A5F5] text-white shadow-sm' : 'text-gray-500'
+                                                            }`}
+                                                    >
+                                                        {t === 'notice' ? '공지사항' : '자유소통'}
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            <div className="max-h-[300px] overflow-y-auto">
+                                                {innerTab === 'notice' && (
+                                                    <div className="flex flex-col gap-3">
+                                                        {isAdmin && (
+                                                            <div className="flex flex-col gap-2">
+                                                                <textarea
+                                                                    value={newNotice}
+                                                                    onChange={e => setNewNotice(e.target.value)}
+                                                                    placeholder="공지 내용을 입력하세요"
+                                                                    className="w-full bg-gray-50 px-3 py-2 rounded-xl text-xs outline-none resize-none border border-gray-100 focus:border-blue-200"
+                                                                    rows={2}
+                                                                />
+                                                                <button onClick={addNotice} className="self-end px-4 py-1.5 bg-[#42A5F5] text-white rounded-lg text-xs font-bold">등록</button>
+                                                            </div>
+                                                        )}
+                                                        {notices.length === 0 ? (
+                                                            <p className="text-center py-4 text-xs text-gray-400">공지사항이 없습니다.</p>
+                                                        ) : notices.map((n, i) => (
+                                                            <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-100" onClick={() => setSelectedNotice(n)}>
+                                                                <p className="text-xs font-bold text-gray-800 line-clamp-1">{n.title}</p>
+                                                                <p className="text-[10px] text-gray-400 mt-1">{n.date}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {innerTab === 'comm' && (
+                                                    <div className="flex flex-col gap-3">
+                                                        <div className="space-y-2.5">
+                                                            {communications.length === 0 ? (
+                                                                <p className="text-center py-4 text-xs text-gray-400">소통 내용이 없습니다.</p>
+                                                            ) : communications.map((c, i) => (
+                                                                <div key={i} className="flex gap-2">
+                                                                    <div className="w-6 h-6 rounded-full bg-blue-100 text-[#42A5F5] text-[10px] flex items-center justify-center font-bold shrink-0">{c.author[0]}</div>
+                                                                    <div className="flex-1 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                                                                        <div className="flex justify-between items-center mb-0.5">
+                                                                            <span className="text-[10px] font-bold text-gray-700">{c.author}</span>
+                                                                            <span className="text-[9px] text-gray-400">{c.date}</span>
+                                                                        </div>
+                                                                        <p className="text-xs text-gray-600">{c.content}</p>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        {user && (
+                                                            <div className="flex gap-2 pt-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={newComm}
+                                                                    onChange={e => setNewComm(e.target.value)}
+                                                                    placeholder="메시지 입력"
+                                                                    className="flex-1 bg-gray-50 px-3 py-2 rounded-xl text-xs outline-none border border-gray-100 focus:border-blue-200"
+                                                                    onKeyDown={e => e.key === 'Enter' && addComm()}
+                                                                />
+                                                                <button onClick={addComm} className="px-3 py-1.5 bg-[#42A5F5] text-white rounded-lg text-xs font-bold">전송</button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="px-4 pb-4 max-h-64 overflow-y-auto">
-                                    {innerTab === 'team' && (
-                                        <div className="h-full overflow-y-auto">
+
+                                {/* Team Members Panel */}
+                                <div className="flex flex-col">
+                                    <button
+                                        onClick={() => {
+                                            setIsMobileMembersExpanded(!isMobileMembersExpanded);
+                                            if (!isMobileMembersExpanded) setIsMobilePanelExpanded(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between bg-white px-4 py-3.5 rounded-2xl border border-gray-100 shadow-sm active:scale-[0.98] transition-all ${isMobileMembersExpanded ? 'ring-2 ring-blue-100' : ''}`}
+                                    >
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+                                                <User size={18} />
+                                            </div>
+                                            <span className="font-bold text-gray-700 text-sm">팀원 목록</span>
+                                        </div>
+                                        <div className={`transition-transform duration-300 ${isMobileMembersExpanded ? 'rotate-180' : ''}`}>
+                                            <ChevronDown size={20} className="text-gray-400" />
+                                        </div>
+                                    </button>
+
+                                    <div
+                                        className={`overflow-hidden transition-[max-height,opacity] duration-500 ease-in-out ${isMobileMembersExpanded ? 'max-h-[600px] opacity-100 mt-3' : 'max-h-0 opacity-0'
+                                            }`}
+                                    >
+                                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                                             {isAdmin && (
-                                                <>
+                                                <div className="flex gap-2 mb-4">
                                                     <button
                                                         onClick={() => { setSettlementMsg(''); setAdminModal('settlement'); }}
-                                                        className="w-full mb-2 py-2.5 rounded-xl border-2 border-dashed border-[#059c13] text-[#059c13] text-sm font-semibold hover:bg-green-50 transition-colors"
+                                                        className="flex-1 py-2.5 rounded-xl border border-green-200 bg-green-50/50 text-green-700 text-[11px] font-bold"
                                                     >
-                                                        + 정산 입력
+                                                        정산 입력
                                                     </button>
                                                     <button
                                                         onClick={() => setAddMemberModal(true)}
-                                                        className="w-full mb-3 py-2.5 rounded-xl border-2 border-dashed border-[#42A5F5] text-[#42A5F5] text-sm font-semibold hover:bg-blue-50 transition-colors"
+                                                        className="flex-1 py-2.5 rounded-xl border border-blue-200 bg-blue-50/50 text-[#42A5F5] text-[11px] font-bold"
                                                     >
-                                                        + 팀원 추가
+                                                        팀원 추가
                                                     </button>
-                                                </>
-                                            )}
-                                            {members.length === 0 ? (
-                                                <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                                                    <span className="text-4xl mb-2">👥</span>
-                                                    <p className="text-sm">팀원이 없습니다.</p>
                                                 </div>
-                                            ) : (
-                                                <div className="space-y-2">
-                                                    {members.map(m => {
+                                            )}
+                                            <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
+                                                {members.length === 0 ? (
+                                                    <p className="text-center py-6 text-xs text-gray-400">팀원이 없습니다.</p>
+                                                ) : (
+                                                    members.map(m => {
                                                         const isSelected = selectedMember === m.name;
                                                         return (
                                                             <div
                                                                 key={m.name}
                                                                 onClick={() => setSelectedMember(isSelected ? null : m.name)}
-                                                                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected ? 'border-[#42A5F5] bg-blue-50' : 'border-gray-100 bg-white hover:border-blue-200'}`}
+                                                                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${isSelected ? 'border-[#42A5F5] bg-blue-50' : 'border-gray-50 bg-gray-50/30'}`}
                                                             >
-                                                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                                                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0"
                                                                     style={{ backgroundColor: m.color ?? '#42A5F5' }}>
                                                                     {m.name[0]}
                                                                 </div>
-                                                                <span className={`flex-1 font-semibold text-sm ${isSelected ? 'text-[#42A5F5]' : 'text-gray-800'}`}>{m.name}</span>
-                                                                {m.phone && (
-                                                                    <a
-                                                                        href={`tel:${m.phone}`}
-                                                                        onClick={e => e.stopPropagation()}
-                                                                        className="w-7 h-7 flex items-center justify-center rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                                                                        title={`전화: ${m.phone}`}
-                                                                    ><Phone size={14} /></a>
-                                                                )}
-                                                                <button
-                                                                    onClick={e => { e.stopPropagation(); router.push(`/schedule/view/${shortId}/settlement/${encodeURIComponent(m.name)}?uid=${docId ?? ''}`); }}
-                                                                    className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-colors"
-                                                                    title="정산표"
-                                                                ><ClipboardList size={14} /></button>
-                                                                {isAdmin && (
-                                                                    <button onClick={e => { e.stopPropagation(); removeMember(m.name); }}
-                                                                        className="text-gray-300 hover:text-red-400 text-lg ml-1">×</button>
-                                                                )}
+                                                                <span className={`flex-1 font-bold text-xs ${isSelected ? 'text-[#42A5F5]' : 'text-gray-700'}`}>{m.name}</span>
+                                                                <div className="flex gap-2">
+                                                                    {m.phone && (
+                                                                        <a href={`tel:${m.phone}`} onClick={e => e.stopPropagation()} className="p-2 rounded-lg bg-green-50 text-green-600 shadow-sm"><Phone size={13} /></a>
+                                                                    )}
+                                                                    <button onClick={e => { e.stopPropagation(); router.push(`/schedule/view/${shortId}/settlement/${encodeURIComponent(m.name)}?uid=${docId ?? ''}`); }} className="p-2 rounded-lg bg-gray-50 text-gray-500 shadow-sm"><ClipboardList size={13} /></button>
+                                                                </div>
                                                             </div>
                                                         );
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {innerTab === 'notice' && (
-                                        <div className="h-full flex flex-col gap-3 overflow-hidden">
-                                            {isAdmin && (
-                                                <div className="flex flex-col gap-2 flex-shrink-0">
-                                                    <textarea
-                                                        value={newNotice}
-                                                        onChange={e => setNewNotice(e.target.value)}
-                                                        placeholder="공지사항 내용 입력 (Ctrl+Enter로 등록)"
-                                                        className="w-full input-field px-3 py-3 rounded-xl text-sm outline-none resize-none"
-                                                        rows={3}
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter' && e.ctrlKey) {
-                                                                e.preventDefault();
-                                                                addNotice();
-                                                            }
-                                                        }}
-                                                    />
-                                                    <button onClick={addNotice} className="self-end px-6 py-2 bg-[#42A5F5] text-white rounded-xl text-sm font-bold hover:bg-blue-600 transition-colors">등록</button>
-                                                </div>
-                                            )}
-                                            <div className="flex-1 overflow-y-auto pr-1">
-                                                {notices.length === 0 ? (
-                                                    <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                                                        <span className="text-4xl mb-2">📢</span>
-                                                        <p className="text-sm">공지사항이 없습니다.</p>
-                                                    </div>
-                                                ) : notices.map((n, i) => (
-                                                    <div key={i} className="bg-white rounded-xl p-3 mb-3 border border-gray-100 flex items-start gap-3 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setSelectedNotice(n)}>
-                                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold flex-shrink-0 mt-0.5">{n.type}</span>
-                                                        <div className="flex-1">
-                                                            <p className="text-sm text-gray-800 overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{n.title}</p>
-                                                            <p className="text-xs text-gray-400 mt-1">{n.date}</p>
-                                                        </div>
-                                                        {isAdmin && (
-                                                            <button onClick={(e) => { e.stopPropagation(); removeNotice(i); }} className="text-gray-300 hover:text-red-400">×</button>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                    })
+                                                )}
                                             </div>
                                         </div>
-                                    )}
+                                    </div>
+                                </div>
+                            </div>
 
-                                    {innerTab === 'comm' && (
-                                        <div className="h-full flex flex-col gap-2.5 overflow-hidden">
-                                            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                                                {communications.length === 0 ? (
-                                                    <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                                                        <span className="text-4xl mb-2">💬</span>
-                                                        <p className="text-sm">소통 내용이 없습니다.</p>
-                                                    </div>
-                                                ) : communications.map((c, i) => (
-                                                    <div key={i} className="bg-white rounded-xl p-3 border border-gray-100">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <div className="w-6 h-6 rounded-full bg-[#42A5F5] text-white text-xs flex items-center justify-center font-bold">{c.author[0]}</div>
-                                                            <span className="text-xs font-bold text-gray-700">{c.author}</span>
-                                                            <span className="text-xs text-gray-400 ml-auto">{c.date}</span>
-                                                        </div>
-                                                        <p className="text-sm text-gray-700 ml-8">{c.content}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            {user && (
-                                                <div className="flex gap-2 pt-1 flex-shrink-0">
-                                                    <input
-                                                        type="text"
-                                                        value={newComm}
-                                                        onChange={e => setNewComm(e.target.value)}
-                                                        placeholder="메시지를 입력하세요"
-                                                        className="flex-1 input-field px-3 py-2.5 rounded-xl text-sm outline-none bg-white border shadow-sm focus:border-[#42A5F5]"
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                                                                addComm();
-                                                            }
-                                                        }}
-                                                    />
-                                                    <button onClick={addComm} className="px-4 py-2 bg-[#42A5F5] text-white rounded-xl text-sm font-bold">전송</button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                            {/* Calendar Section */}
+                            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-10">
+                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-3">
+                                    <CalendarHeader />
+                                    <WeekdayHeader />
+                                    <CalendarGrid />
                                 </div>
                             </div>
                         </div>
@@ -1171,7 +1189,7 @@ export default function ScheduleViewPage() {
                                 {selectedNotice.title}
                             </div>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setSelectedNotice(null)}
                             className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
                         >

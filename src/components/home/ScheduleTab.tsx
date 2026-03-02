@@ -71,9 +71,8 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                             setAddMemberModal(true);
                         }
                     }}
-                    className={`${isFullCalendar ? 'h-32 md:h-36' : 'h-24 md:h-28'} border-b border-r border-gray-100 p-2 relative hover:bg-blue-50 transition-all cursor-pointer overflow-hidden ${
-                        isToday ? 'bg-blue-50/50' : ''
-                    } ${isHighlighted ? 'bg-blue-100 border-blue-300' : ''}`}
+                    className={`${isFullCalendar ? 'h-32 md:h-36' : 'h-24 md:h-28'} border-b border-r border-gray-100 p-2 relative hover:bg-blue-50 transition-all cursor-pointer overflow-hidden ${isToday ? 'bg-blue-50/50' : ''
+                        } ${isHighlighted ? 'bg-blue-100 border-blue-300' : ''}`}
                 >
                     <div className="flex justify-between items-start">
                         <span className={`text-sm font-bold ${date.getDay() === 0 ? 'text-red-500' : date.getDay() === 6 ? 'text-blue-500' : 'text-gray-700'} ${isToday ? 'bg-blue-100 w-6 h-6 flex items-center justify-center rounded-full' : ''}`}>
@@ -107,13 +106,13 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
             <div className="flex justify-center -mb-2">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <button
-                        onClick={() => userSchedule ? router.push(`/schedule/view/${userSchedule.shortId}`) : router.push('/schedule/create')}
+                        onClick={() => userSchedule ? router.push(`/schedule/entrance/${userSchedule.shortId}`) : router.push('/schedule/create')}
                         className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         {userSchedule ? (
                             <>
                                 <LogIn className="w-5 h-5" />
-                                일정표 방문
+                                공유 일정표
                             </>
                         ) : (
                             <>
@@ -122,7 +121,7 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                             </>
                         )}
                     </button>
-                    
+
                     {/* 정산입력 버튼 - PC에서만 표시 */}
                     {userSchedule && (
                         <button
@@ -155,7 +154,7 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                             )}
                         </div>
                         <div className="flex items-center gap-2">
-                            <button 
+                            <button
                                 onClick={() => setIsFullCalendar(!isFullCalendar)}
                                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                                 title={isFullCalendar ? "분할 보기" : "전체 보기"}
@@ -213,71 +212,70 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                         </div>
 
                         <div className="p-4 flex-1 min-h-0 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-                        {members.length === 0 ? (
-                            <div className="text-center py-8">
-                                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                <p className="text-gray-500 text-sm font-medium mb-3">등록된 팀원이 없습니다</p>
-                                <button
-                                    onClick={() => setAddMemberModal(true)}
-                                    className="text-blue-600 text-sm font-bold hover:underline"
-                                >
-                                    + 팀원 추가하기
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {members.map((member, index) => {
-                                    const isSelected = selectedMember === member.name;
-                                    return (
-                                        <div
-                                            key={member.name}
-                                            onClick={() => setSelectedMember(isSelected ? null : member.name)}
-                                            className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                                                isSelected
+                            {members.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500 text-sm font-medium mb-3">등록된 팀원이 없습니다</p>
+                                    <button
+                                        onClick={() => setAddMemberModal(true)}
+                                        className="text-blue-600 text-sm font-bold hover:underline"
+                                    >
+                                        + 팀원 추가하기
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {members.map((member, index) => {
+                                        const isSelected = selectedMember === member.name;
+                                        return (
+                                            <div
+                                                key={member.name}
+                                                onClick={() => setSelectedMember(isSelected ? null : member.name)}
+                                                className={`p-4 rounded-2xl border cursor-pointer transition-all ${isSelected
                                                     ? 'bg-blue-50 border-blue-200 shadow-sm'
                                                     : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div
-                                                        className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                                                        style={{
-                                                            backgroundColor: member.color || `hsl(${index * 137.5 % 360}, 70%, 50%)`
-                                                        }}
-                                                    >
-                                                        {member.name.charAt(0)}
+                                                    }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                                                            style={{
+                                                                backgroundColor: member.color || `hsl(${index * 137.5 % 360}, 70%, 50%)`
+                                                            }}
+                                                        >
+                                                            {member.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-sm">{member.name}</p>
+                                                            {member.phone && (
+                                                                <p className="text-xs text-gray-500">{member.phone}</p>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="font-bold text-sm">{member.name}</p>
+                                                    <div className="flex items-center gap-2">
                                                         {member.phone && (
-                                                            <p className="text-xs text-gray-500">{member.phone}</p>
+                                                            <a
+                                                                href={`tel:${member.phone}`}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="p-1.5 hover:bg-green-100 rounded-full transition-colors"
+                                                                title="전화걸기"
+                                                            >
+                                                                <Phone className="w-3.5 h-3.5 text-green-600" />
+                                                            </a>
+                                                        )}
+                                                        {isSelected && (
+                                                            <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                                                선택됨
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {member.phone && (
-                                                        <a
-                                                            href={`tel:${member.phone}`}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="p-1.5 hover:bg-green-100 rounded-full transition-colors"
-                                                            title="전화걸기"
-                                                        >
-                                                            <Phone className="w-3.5 h-3.5 text-green-600" />
-                                                        </a>
-                                                    )}
-                                                    {isSelected && (
-                                                        <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                                            선택됨
-                                                        </div>
-                                                    )}
-                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -325,11 +323,10 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                                         <div
                                             key={member.name}
                                             onClick={() => setSelectedMember(isSelected ? null : member.name)}
-                                            className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                                                isSelected
-                                                    ? 'bg-blue-50 border-blue-200 shadow-sm'
-                                                    : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
-                                            }`}
+                                            className={`p-4 rounded-2xl border cursor-pointer transition-all ${isSelected
+                                                ? 'bg-blue-50 border-blue-200 shadow-sm'
+                                                : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
+                                                }`}
                                         >
                                             <div className="flex flex-col items-center text-center">
                                                 <div

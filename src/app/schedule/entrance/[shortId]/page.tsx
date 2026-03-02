@@ -12,6 +12,7 @@ const COMPANIES: Record<string, { name: string; image: string }> = {
     cj: { name: '씨제이', image: '/cj.png' },
     lotte: { name: '롯데', image: '/lot.png' },
     logen: { name: '로젠', image: '/log.png' },
+    hanjin: { name: '한진', image: '/hanjin.png' },
     etc: { name: '기타', image: '/logo512.png' },
 };
 

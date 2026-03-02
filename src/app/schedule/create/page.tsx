@@ -11,6 +11,7 @@ const COMPANIES = [
     { value: 'cj', name: '씨제이', image: '/cj.png' },
     { value: 'lotte', name: '롯데', image: '/lot.png' },
     { value: 'logen', name: '로젠', image: '/log.png' },
+    { value: 'hanjin', name: '한진', image: '/hanjin.png' },
     { value: 'etc', name: '기타', image: '/logo512.png' },
 ];
 

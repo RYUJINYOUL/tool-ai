@@ -82,8 +82,8 @@ const BRANDS: Record<BrandType, BrandConfig> = {
     },
     hanjin: {
         name: '한진',
-        logo: '/logo512.png', // Fallback as no specific logo provided
-        primaryColor: '#F8F9FA',
+        logo: '/hanjin.png',
+        primaryColor: '#F0F7FF', // Light blue tint for "blue-focused" background
         secondaryColor: '#004191',
         accentColor: '#FFD500',
         textColor: '#1a1a1a'
