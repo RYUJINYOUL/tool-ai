@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CircleChevronUp, StickyNote, ChevronDown, Link as LinkIcon } from 'lucide-react';
+import { CircleChevronUp, StickyNote, ChevronDown, Link as LinkIcon, X, ZoomIn } from 'lucide-react';
 import { useNotices } from '@/hooks/useNotices';
 
 export default function NoticeBoard() {
     const [isNoticeOpen, setIsNoticeOpen] = useState(false);
     const [expandedNoticeIds, setExpandedNoticeIds] = useState<Set<string>>(new Set());
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const { notices, isNoticesLoading } = useNotices();
 
     const toggleExpand = (id: string, e: React.MouseEvent) => {
@@ -23,7 +24,7 @@ export default function NoticeBoard() {
     return (
         <>
             <footer
-                className="w-full max-w-[900px] mx-auto py-5 text-center text-gray-500 text-sm font-bold border-t border-gray-100 bg-white mt-auto cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 group"
+                className="w-full max-w-[600px] mx-auto py-4 text-center text-gray-500 text-sm font-bold border-t border-gray-100 bg-white mt-auto cursor-pointer hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 group"
                 onClick={() => setIsNoticeOpen(true)}
             >
                 <CircleChevronUp className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" />
@@ -37,7 +38,7 @@ export default function NoticeBoard() {
                     onClick={() => setIsNoticeOpen(false)}
                 >
                     <div
-                        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] shadow-2xl max-h-[80vh] flex flex-col animate-slide-up"
+                        className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[500px] bg-white rounded-t-[32px] shadow-2xl max-h-[80vh] flex flex-col animate-slide-up"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Handle Bar */}
@@ -46,9 +47,9 @@ export default function NoticeBoard() {
                         </div>
 
                         {/* Header */}
-                        <div className="px-6 pb-4 border-b border-gray-50 flex items-center justify-between">
-                            <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
-                                <StickyNote className="w-6 h-6 text-blue-500" />
+                        <div className="px-5 pb-3 border-b border-gray-50 flex items-center justify-between">
+                            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                                <StickyNote className="w-5 h-5 text-blue-500" />
                                 공지사항
                             </h3>
                             <button
@@ -60,7 +61,7 @@ export default function NoticeBoard() {
                         </div>
 
                         {/* Content Scroll Area */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                             {isNoticesLoading ? (
                                 <div className="space-y-4">
                                     {[1, 2, 3].map(i => (
@@ -74,10 +75,10 @@ export default function NoticeBoard() {
                                 notices.map((notice) => {
                                     const isExpanded = expandedNoticeIds.has(notice.id);
                                     return (
-                                        <div key={notice.id} className="p-5 rounded-2xl bg-gray-50 border border-gray-100 hover:border-blue-200 transition-colors">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h4 className="font-bold text-gray-900 text-lg">{notice.title}</h4>
-                                                <span className="text-xs text-gray-400 font-medium whitespace-nowrap ml-4">
+                                        <div key={notice.id} className="p-4 rounded-xl bg-gray-50 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h4 className="font-bold text-gray-900 text-base leading-tight flex-1 mr-3">{notice.title}</h4>
+                                                <span className="text-xs text-gray-400 font-medium whitespace-nowrap">
                                                     {notice.createdAt?.seconds
                                                         ? new Date(notice.createdAt.seconds * 1000).toLocaleDateString('ko-KR')
                                                         : '정보 없음'
@@ -87,14 +88,22 @@ export default function NoticeBoard() {
 
                                             {/* Notice Images */}
                                             {notice.imageUrls && notice.imageUrls.length > 0 && (
-                                                <div className="mb-4 flex flex-wrap gap-2 justify-start">
+                                                <div className="mb-3 flex flex-wrap gap-2 justify-start">
                                                     {notice.imageUrls.map((url, idx) => (
-                                                        <img
+                                                        <div
                                                             key={idx}
-                                                            src={url}
-                                                            alt={`공지 이미지 ${idx + 1}`}
-                                                            className="h-32 w-auto max-w-[200px] object-contain rounded-xl border border-gray-100 bg-white"
-                                                        />
+                                                            className="relative group cursor-pointer"
+                                                            onClick={() => setSelectedImage(url)}
+                                                        >
+                                                            <img
+                                                                src={url}
+                                                                alt={`공지 이미지 ${idx + 1}`}
+                                                                className="h-24 w-auto max-w-[150px] object-contain rounded-lg border border-gray-100 bg-white transition-transform group-hover:scale-105"
+                                                            />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
+                                                                <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </div>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             )}
@@ -123,16 +132,16 @@ export default function NoticeBoard() {
 
                                             {/* Notice Links */}
                                             {(notice.link || (notice.links && notice.links.length > 0)) && (
-                                                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                                                <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
                                                     {notice.link && (
                                                         <a
                                                             href={notice.link}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="flex items-center gap-3 w-full p-3 bg-blue-50 rounded-xl text-blue-700 hover:bg-blue-100 transition-colors font-bold text-sm"
+                                                            className="flex items-center gap-2 w-full p-2.5 bg-blue-50 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors font-semibold text-sm"
                                                         >
                                                             <LinkIcon className="w-4 h-4" />
-                                                            링크
+                                                            링크 보기
                                                         </a>
                                                     )}
                                                     {notice.links && notice.links.map((link, idx) => (
@@ -141,7 +150,7 @@ export default function NoticeBoard() {
                                                             href={link.url}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="flex items-center gap-2 text-sm text-blue-600 hover:underline font-medium px-1"
+                                                            className="flex items-center gap-2 p-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
                                                         >
                                                             <LinkIcon className="w-3.5 h-3.5" />
                                                             {link.title}
@@ -153,15 +162,44 @@ export default function NoticeBoard() {
                                     );
                                 })
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                                    <StickyNote className="w-12 h-12 mb-4 opacity-20" />
-                                    <p className="font-medium">등록된 공지사항이 없습니다.</p>
+                                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                                    <StickyNote className="w-10 h-10 mb-3 opacity-30" />
+                                    <p className="font-medium text-sm">등록된 공지사항이 없습니다.</p>
                                 </div>
                             )}
                         </div>
 
                         {/* Bottom Safe Area */}
-                        <div className="h-8 bg-white"></div>
+                        <div className="h-6 bg-white"></div>
+                    </div>
+                </div>
+            )}
+
+            {/* Image Zoom Modal */}
+            {selectedImage && (
+                <div
+                    className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div
+                        className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Close Button */}
+                        <button
+                            onClick={() => setSelectedImage(null)}
+                            className="absolute top-4 right-4 z-10 p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors"
+                        >
+                            <X className="w-6 h-6 text-white" />
+                        </button>
+
+                        {/* Image */}
+                        <img
+                            src={selectedImage}
+                            alt="확대된 이미지"
+                            className="w-full h-full object-contain"
+                            style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+                        />
                     </div>
                 </div>
             )}

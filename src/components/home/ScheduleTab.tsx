@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar as CalendarIcon, LogIn, ChevronLeft, ChevronRight, Users, Plus, Phone } from 'lucide-react';
+import { Calendar as CalendarIcon, LogIn, ChevronLeft, ChevronRight, Users, Plus, Phone, ClipboardList, LayoutDashboard, Youtube  } from 'lucide-react';
 import { useScheduleData } from '@/hooks/useScheduleData';
+import { useAuth } from '@/context/auth-context';
 import { Schedule } from '@/types/schedule';
 
 interface ScheduleTabProps {
@@ -12,6 +13,7 @@ interface ScheduleTabProps {
 
 export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
     const router = useRouter();
+    const { user } = useAuth();
     const {
         members,
         dayOffs,
@@ -106,18 +108,44 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
             <div className="flex justify-center -mb-2">
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <button
-                        onClick={() => userSchedule ? router.push(`/schedule/entrance/${userSchedule.shortId}`) : router.push('/schedule/create')}
+                        onClick={() => userSchedule ? router.push(`/schedule/view/${userSchedule.shortId}`) : router.push('/schedule/create')}
                         className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         {userSchedule ? (
                             <>
                                 <LogIn className="w-5 h-5" />
-                                공유 일정표
+                                공유 일정표 입장
                             </>
                         ) : (
                             <>
                                 <Plus className="w-5 h-5" />
                                 팀 일정표 만들기
+                            </>
+                        )}
+                    </button>
+
+                    <button
+                     onClick={() => {
+                        if (userSchedule) {
+                            // 내 서비스 내부 이동은 기존처럼 router.push
+                            router.push(`/schedule/entrance/${userSchedule.shortId}`);
+                        } else {
+                            // 외부 링크(유튜브)는 새 탭에서 열기
+                            window.open('https://www.youtube.com/@%EC%9A%A9%EC%B9%B4%EC%95%B1', '_blank', 'noopener,noreferrer');
+                        }
+                    }}
+               
+                        className="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-pink-500 text-white px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
+                    >
+                        {userSchedule ? (
+                            <>
+                                <LayoutDashboard className="w-5 h-5" />
+                                공유 일정표 메인
+                            </>
+                        ) : (
+                            <>
+                                <Youtube className="w-5 h-5" />
+                                유튜브 영상 보기 
                             </>
                         )}
                     </button>
@@ -131,7 +159,7 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                             </svg>
-                            정산 입력
+                            정산 엑셀 입력
                         </button>
                     )}
                 </div>
@@ -254,16 +282,14 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        {member.phone && (
-                                                            <a
-                                                                href={`tel:${member.phone}`}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="p-1.5 hover:bg-green-100 rounded-full transition-colors"
-                                                                title="전화걸기"
-                                                            >
-                                                                <Phone className="w-3.5 h-3.5 text-green-600" />
-                                                            </a>
-                                                        )}
+                                                        <a
+                                                            href={`/schedule/view/${userSchedule?.shortId}/settlement/${encodeURIComponent(member.name)}?uid=${user?.uid || ''}`}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="p-1.5 hover:bg-blue-100 rounded-full transition-colors"
+                                                            title="정산 입력"
+                                                        >
+                                                            <ClipboardList className="w-3.5 h-3.5 text-blue-600" />
+                                                        </a>
                                                         {isSelected && (
                                                             <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
                                                                 선택됨
@@ -342,16 +368,14 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                                                     <p className="text-xs text-gray-500 mb-2">{member.phone}</p>
                                                 )}
                                                 <div className="flex items-center gap-2">
-                                                    {member.phone && (
-                                                        <a
-                                                            href={`tel:${member.phone}`}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="p-1.5 hover:bg-green-100 rounded-full transition-colors"
-                                                            title="전화걸기"
-                                                        >
-                                                            <Phone className="w-3.5 h-3.5 text-green-600" />
-                                                        </a>
-                                                    )}
+                                                    <a
+                                                        href={`/schedule/view/${userSchedule?.shortId}/settlement/${encodeURIComponent(member.name)}?uid=${user?.uid || ''}`}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="p-1.5 hover:bg-blue-100 rounded-full transition-colors"
+                                                        title="정산 입력"
+                                                    >
+                                                        <ClipboardList className="w-3.5 h-3.5 text-blue-600" />
+                                                    </a>
                                                     {isSelected && (
                                                         <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
                                                             선택됨

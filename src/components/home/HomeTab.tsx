@@ -28,7 +28,7 @@ export default function HomeTab({ setActiveTab }: HomeTabProps) {
         <div className="flex flex-col items-center justify-center pt-10 md:pt-25 pb-1">
             <div className="w-full max-w-[600px] text-center mb-12">
                 <h2 className="text-2xl md:text-2xl font-bold mb-10 tracking-tight text-[#1a1a1a]">
-                    용카 AI로 업무 시간을 50% 줄여 보세요.
+                    용카로 업무를 50% 줄여 보세요.
                 </h2>
 
                 <div className="relative group mb-10">

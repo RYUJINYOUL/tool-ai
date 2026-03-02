@@ -7,6 +7,8 @@ export interface Schedule {
   shortId: string; // 공유용 짧은 ID
   createdAt: string;
   updatedAt?: string;
+  gallery?: string[]; // 갤러리 이미지 URL 배열
+  galleryStoragePaths?: string[]; // 갤러리 이미지 저장 경로 배열
 }
 
 export interface ScheduleMember {
