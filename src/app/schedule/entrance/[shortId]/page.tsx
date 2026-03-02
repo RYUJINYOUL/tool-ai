@@ -364,7 +364,7 @@ export default function ScheduleEntrancePage() {
             }} />
             <div className="min-h-screen bg-white">
             {/* Header gradient */}
-            <div className="bg-[#42A5F5] pt-14 pb-10 px-6 text-white">
+            <div className="bg-[#42A5F5] pt-14 pb-10 px-1 text-white">
                 <div className="max-w-lg mx-auto">
                     <div className="flex items-center gap-4 mb-8 mx-3">
                         <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 overflow-hidden p-2 flex-shrink-0">
@@ -384,7 +384,7 @@ export default function ScheduleEntrancePage() {
                     <div className="relative bg-white/10 backdrop-blur-sm rounded-3xl p-4 border border-white/20 mx-3">
                     <div className="flex items-center justify-between mb-7 px-1">
         <div className="flex items-center gap-2">
-            <span className="text-white/90 text-md font-bold tracking-tight">{schedule.name} 사진첩</span>
+            <span className="text-white/90 text-md font-bold tracking-tight">{schedule.name} 갤러리</span>
             <span className="bg-white/20 text-[10px] px-1.5 py-0.5 rounded-full text-white/70 font-medium">
                 {gallery.length}
             </span>
@@ -833,7 +833,7 @@ export default function ScheduleEntrancePage() {
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => window.open(link.url, '_blank')}
-                                                className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors"
+                                                className="px-1 py-1.5 bg-blue-500 text-white text-xs rounded-lg hover:bg-blue-600 transition-colors"
                                             >
                                                 열기
                                             </button>
@@ -952,7 +952,7 @@ export default function ScheduleEntrancePage() {
                                             newTitles[index] = e.target.value;
                                             setImageTitles(newTitles);
                                         }}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500"
+                                        className="w-full px-1 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500"
                                     />
                                 </div>
                             ))}
