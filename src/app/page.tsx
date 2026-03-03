@@ -66,7 +66,7 @@ function HomePageContent() {
     if (isLoggedIn && firebaseUser) {
       const unsub = onSnapshot(doc(db, 'schedules', firebaseUser.uid), (snapshot) => {
         if (snapshot.exists()) {
-          setUserSchedule(snapshot.data() as Schedule);
+          setUserSchedule({ id: snapshot.id, ...snapshot.data() } as Schedule);
         } else {
           setUserSchedule(null);
         }

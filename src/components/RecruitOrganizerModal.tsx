@@ -96,7 +96,7 @@ ${resultData.description}
         setIsSaving(true);
         try {
             const text = `
-[AI 정리 결과]
+[AI 정리 결과 : 출처 tool-ai.kr ]
 □ 택배사명 : ${resultData.courier}
 □ 배송지 주소 : ${resultData.delivery_address}
 □ 터미널 주소 : ${resultData.terminal_address}

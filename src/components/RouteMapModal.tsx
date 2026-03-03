@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Map as MapIcon, Save, Trash2, Undo2, MousePointer2, Maximize2, Minimize2, Download } from 'lucide-react';
+import { X, Map as MapIcon, Save, Trash2, Undo2, MousePointer2, Maximize2, Minimize2, Download, Plus, Minus } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -33,6 +33,10 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
     const markersRef = useRef<any[]>([]);
     const [points, setPoints] = useState<{ lat: number; lng: number }[]>([]);
 
+    // ── 줌 범위 상수: 카카오맵 level은 숫자가 작을수록 확대, 클수록 축소
+    const ZOOM_MIN_LEVEL = 2; // 이 이하로 확대 불가 (너무 가까이)
+    const ZOOM_MAX_LEVEL = 7; // 이 이상으로 축소 불가 (너무 멀리)
+
     // Load Kakao Map Script
     useEffect(() => {
         if (!isOpen) return;
@@ -53,12 +57,24 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
                 if (!mapContainer.current) return;
 
                 const options = {
-                    center: new window.kakao.maps.LatLng(37.5665, 126.9780), // Default to Seoul
+                    center: new window.kakao.maps.LatLng(37.5665, 126.9780),
                     level: 3
                 };
 
                 const map = new window.kakao.maps.Map(mapContainer.current, options);
                 mapInstance.current = map;
+
+                // ── 줌 범위 제한 (지도 이동/드래그와 완전 독립적으로 동작)
+                // zoom_changed 이벤트는 휠/더블클릭/줌버튼 모두에 반응하되
+                // 드래그(패닝)에는 전혀 영향을 주지 않음
+                window.kakao.maps.event.addListener(map, 'zoom_changed', () => {
+                    const currentLevel = map.getLevel();
+                    if (currentLevel < ZOOM_MIN_LEVEL) {
+                        map.setLevel(ZOOM_MIN_LEVEL);
+                    } else if (currentLevel > ZOOM_MAX_LEVEL) {
+                        map.setLevel(ZOOM_MAX_LEVEL);
+                    }
+                });
 
                 // Try to get user location
                 if (navigator.geolocation) {
@@ -99,7 +115,6 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
     // Handle map resizing when fullscreen toggles
     useEffect(() => {
         if (mapInstance.current && mapLoaded) {
-            // Need a small timeout to let the DOM classes update
             setTimeout(() => {
                 mapInstance.current.relayout();
             }, 50);
@@ -110,7 +125,6 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
     useEffect(() => {
         if (!mapInstance.current || !mapLoaded) return;
 
-        // Clean up extra markers
         if (points.length === 0) {
             markersRef.current.forEach(m => m.setMap(null));
             markersRef.current = [];
@@ -122,7 +136,6 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
             if (m) m.setMap(null);
         }
 
-        // Add or Update markers
         points.forEach((p, i) => {
             const latlng = new window.kakao.maps.LatLng(p.lat, p.lng);
 
@@ -192,6 +205,24 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
         }
     };
 
+    const handleZoomIn = () => {
+        if (mapInstance.current) {
+            const level = mapInstance.current.getLevel();
+            if (level > ZOOM_MIN_LEVEL) {
+                mapInstance.current.setLevel(level - 1, { animate: true });
+            }
+        }
+    };
+
+    const handleZoomOut = () => {
+        if (mapInstance.current) {
+            const level = mapInstance.current.getLevel();
+            if (level < ZOOM_MAX_LEVEL) {
+                mapInstance.current.setLevel(level + 1, { animate: true });
+            }
+        }
+    };
+
     const handleSave = async () => {
         if (!isLoggedIn || !firebaseUser) {
             alert('로그인이 필요한 기능입니다.');
@@ -212,33 +243,25 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
         setIsCapturing(true);
 
         try {
-            // 1. 지도 안정화 대기
+            // Wait for map to stabilize
             await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // 2. 화상 캡쳐 (지도 영역)
-            if (mapContainer.current) {
+            const captureArea = document.getElementById('map-capture-area');
+            if (captureArea) {
                 try {
-                    // CORS 문제 해결을 위해 이미지 태그들을 프록시 URL로 교체
-                    const imgs = mapContainer.current.querySelectorAll('img');
+                    const imgs = captureArea.querySelectorAll('img');
                     const originalSrcs = new Map<HTMLImageElement, string>();
 
-                    // 모든 이미지를 프록시를 통해 다시 로드 시도
                     const loadPromises = Array.from(imgs).map(img => {
                         return new Promise((resolve) => {
                             const src = img.src;
                             if (src.startsWith('http') && (src.includes('kakaocdn.net') || src.includes('daumcdn.net'))) {
                                 originalSrcs.set(img, src);
-
-                                // 프록시 URL 설정
                                 const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(src)}`;
-
                                 const newImg = new Image();
                                 newImg.crossOrigin = 'anonymous';
-                                newImg.onload = () => {
-                                    img.src = proxyUrl;
-                                    resolve(null);
-                                };
-                                newImg.onerror = () => resolve(null); // 에러나도 진행
+                                newImg.onload = () => { img.src = proxyUrl; resolve(null); };
+                                newImg.onerror = () => resolve(null);
                                 newImg.src = proxyUrl;
                             } else {
                                 resolve(null);
@@ -246,41 +269,32 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
                         });
                     });
 
-                    // 모든 이미지 프록시 로드 대기
                     await Promise.all(loadPromises);
-                    // 스크립트 실행 환경 안정을 위해 짧은 대기
                     await new Promise(r => setTimeout(r, 200));
 
-                    const dataUrl = await domToPng(mapContainer.current, {
+                    const dataUrl = await domToPng(captureArea, {
                         scale: 1,
                         backgroundColor: '#ffffff',
                     });
 
-                    // 컴퓨터에 직접 다운로드 트리거
                     const link = document.createElement('a');
                     link.download = `라우트지도_${routeName.trim()}_${Date.now()}.png`;
                     link.href = dataUrl;
                     link.click();
 
-                    // Storage 업로드를 위한 파일 변환
                     const res = await fetch(dataUrl);
                     const blob = await res.blob();
                     const file = new File([blob], `route_map_${Date.now()}.png`, { type: 'image/png' });
 
-                    // 3. 저장파일(Storage) 탭에 이미지로 저장
                     await uploadImage(file);
 
-                    // 이미지 원복 (UI 유지용)
-                    originalSrcs.forEach((src, img) => {
-                        img.src = src;
-                    });
+                    originalSrcs.forEach((src, img) => { img.src = src; });
                 } catch (captureErr) {
                     console.error("Map capture failed:", captureErr);
                     alert('지도를 이미지로 변환하는 데 실패했습니다. 데이터만 저장합니다.');
                 }
             }
 
-            // 4. Firestore 데이터 저장
             await addDoc(collection(db, 'routeMaps'), {
                 userId: firebaseUser.uid,
                 name: routeName.trim(),
@@ -333,7 +347,16 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
 
                 {/* Map Area */}
                 <div className="flex-1 relative bg-gray-50 overflow-hidden">
-                    <div ref={mapContainer} className="w-full h-full" />
+                    <div id="map-capture-area" className="w-full h-full relative">
+                        <div ref={mapContainer} className="w-full h-full" />
+
+                        {/* Watermark only visible in capture or subtle on UI */}
+                        <div className="absolute bottom-2 right-2 z-[5] pointer-events-none">
+                            <span className="text-[10px] font-black tracking-tighter text-gray-400 opacity-20 select-none">
+                                tool-ai.kr
+                            </span>
+                        </div>
+                    </div>
 
                     {!mapLoaded && (
                         <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
@@ -346,6 +369,25 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
 
                     {/* Map Overlay Controls */}
                     <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                        {/* Zoom Controls */}
+                        <div className="bg-white/90 backdrop-blur-md p-1 rounded-2xl shadow-xl border border-white/50 flex flex-col gap-1">
+                            <button
+                                onClick={handleZoomIn}
+                                className="p-2.5 hover:bg-orange-50 rounded-xl transition-all text-gray-600 hover:text-orange-600 active:scale-90"
+                                title="확대"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                            <div className="h-px bg-gray-100 mx-2" />
+                            <button
+                                onClick={handleZoomOut}
+                                className="p-2.5 hover:bg-orange-50 rounded-xl transition-all text-gray-600 hover:text-orange-600 active:scale-90"
+                                title="축소"
+                            >
+                                <Minus className="w-4 h-4" />
+                            </button>
+                        </div>
+
                         <div className="bg-white/90 backdrop-blur-md p-2 rounded-2xl shadow-xl border border-white/50 flex flex-col gap-1">
                             <button
                                 onClick={handleUndo}
@@ -364,6 +406,13 @@ export default function RouteMapModal({ isOpen, onClose }: RouteMapModalProps) {
                                 <Trash2 className="w-5 h-5" />
                             </button>
                         </div>
+
+                        {/* ── 현재 줌 레벨 표시 */}
+                        {mapLoaded && (
+                            <div className="bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-xl shadow text-[10px] font-bold text-gray-500 text-center tracking-tight">
+                                LV.{mapInstance.current?.getLevel?.() || '3'}
+                            </div>
+                        )}
                     </div>
 
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 w-full max-w-lg px-4">

@@ -33,13 +33,13 @@ export async function POST(req: NextRequest) {
         "license": "화물운송자격증 필요여부",
         "deadline": "모집마감 (예: 채용 시 마감)",
         "contact": "연락처",
-        "description": "상세설명 및 기타 안내"
+        "description": "상세설명 및 기타 안내 (핵심 내용을 '□' 기호를 사용하여 3~5줄로 요약 정리)"
       }
       
       [주의 사항]
       1. 반드시 JSON 형식으로만 응답하세요.
       2. 텍스트에서 찾을 수 없는 정보는 빈 문자열("")로 처리하세요. 특히 '대리점명' 같은 정보가 없으면 비워두세요.
-      3. 가능한 한 텍스트의 내용을 그대로 살려 정리해주세요.
+      3. 가능한 한 텍스트의 내용을 그대로 살려 정리하되, 'description'은 반드시 □ 기호를 사용한 3~5줄 요약으로 작성하세요.
     `;
 
         const result = await model.generateContent(prompt);

@@ -46,6 +46,31 @@ export default function StorageTab() {
         }
     };
 
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const handleDownload = async (item: StorageItem) => {
+        if (item.type !== 'image') return;
+
+        setIsDownloading(true);
+        try {
+            const response = await fetch(item.content);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = item.fileName || 'image.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Download error:', error);
+            alert('이미지 다운로드 중 오류가 발생했습니다.');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     return (
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex-1 flex flex-col min-h-[500px]">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -171,7 +196,7 @@ export default function StorageTab() {
                                 ) : (
                                     <FileText className="w-5 h-5 text-blue-500" />
                                 )}
-                                <h4 className="font-bold text-gray-800">
+                                <h4 className="font-bold text-gray-800 text-sm md:text-base">
                                     {selectedItem.type === 'image' ? (selectedItem.fileName || '이미지 상세') : '메모 상세'}
                                 </h4>
                             </div>
@@ -186,15 +211,15 @@ export default function StorageTab() {
                         {/* Modal Content */}
                         <div className="p-6 max-h-[70vh] overflow-y-auto">
                             {selectedItem.type === 'image' ? (
-                                <div className="flex flex-col items-center gap-4">
+                                <div className="flex flex-col items-center gap-4 text-center">
                                     <img
                                         src={selectedItem.content}
                                         alt={selectedItem.fileName}
-                                        className="max-w-full h-auto rounded-xl shadow-lg border border-gray-100"
+                                        className="max-w-full h-auto rounded-xl shadow-lg border border-gray-100 mb-2"
                                     />
                                 </div>
                             ) : (
-                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 whitespace-pre-wrap text-gray-700 leading-relaxed font-medium">
+                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 whitespace-pre-wrap text-gray-700 leading-relaxed font-medium text-sm">
                                     {selectedItem.content}
                                 </div>
                             )}
@@ -209,16 +234,11 @@ export default function StorageTab() {
                                             navigator.clipboard.writeText(selectedItem.content);
                                             alert('클립보드에 복사되었습니다.');
                                         } else {
-                                            // Simple download for images
-                                            const link = document.createElement('a');
-                                            link.href = selectedItem.content;
-                                            link.download = selectedItem.fileName || 'image.png';
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
+                                            handleDownload(selectedItem);
                                         }
                                     }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all active:scale-95"
+                                    disabled={isDownloading}
+                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl text-sm font-bold transition-all active:scale-95"
                                 >
                                     {selectedItem.type === 'text' ? (
                                         <>
@@ -227,7 +247,11 @@ export default function StorageTab() {
                                         </>
                                     ) : (
                                         <>
-                                            <DownloadCloud className="w-4 h-4" />
+                                            {isDownloading ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <DownloadCloud className="w-4 h-4" />
+                                            )}
                                             이미지 다운로드
                                         </>
                                     )}
@@ -243,7 +267,7 @@ export default function StorageTab() {
                                     삭제
                                 </button>
                             </div>
-                            <span className="text-xs text-gray-400 font-bold">
+                            <span className="text-[10px] md:text-xs text-gray-400 font-bold tabular-nums">
                                 {selectedItem.createdAt?.seconds
                                     ? new Date(selectedItem.createdAt.seconds * 1000).toLocaleString()
                                     : '방금 전'

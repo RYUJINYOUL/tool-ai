@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { X, Image as ImageIcon, Download, Type, Check, Loader2, Sparkles, Maximize2, Minimize2, Save } from 'lucide-react';
+import { X, Image as ImageIcon, Download, Type, Check, Loader2, Sparkles, ZoomIn, ZoomOut, Save } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { useUserStorage } from '@/hooks/useUserStorage';
 import { useAuth } from '@/context/auth-context';
@@ -83,7 +83,7 @@ const BRANDS: Record<BrandType, BrandConfig> = {
     hanjin: {
         name: '한진',
         logo: '/hanjin.png',
-        primaryColor: '#F0F7FF', // Light blue tint for "blue-focused" background
+        primaryColor: '#F0F7FF',
         secondaryColor: '#004191',
         accentColor: '#FFD500',
         textColor: '#1a1a1a'
@@ -108,9 +108,9 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
     const [inputText, setInputText] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
     const [recruitData, setRecruitData] = useState<RecruitData | null>(null);
     const [isSavingToStorage, setIsSavingToStorage] = useState(false);
+    const [zoomLevel, setZoomLevel] = useState(70);
     const previewRef = useRef<HTMLDivElement>(null);
     const { uploadImage } = useUserStorage();
     const { isLoggedIn } = useAuth();
@@ -122,7 +122,6 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
             alert('분석할 공고 내용을 입력해주세요.');
             return;
         }
-
         setIsAnalyzing(true);
         try {
             const response = await fetch('/api/ai/recruit', {
@@ -130,12 +129,9 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: inputText }),
             });
-
             if (!response.ok) throw new Error('AI analysis failed');
-
             const data = await response.json();
             setRecruitData(data);
-
             const courier = data.courier || '';
             if (courier.includes('CJ') || courier.includes('대한통운')) setSelectedBrand('cj');
             else if (courier.includes('쿠팡')) setSelectedBrand('coupang');
@@ -143,7 +139,6 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
             else if (courier.includes('롯데')) setSelectedBrand('lotte');
             else if (courier.includes('한진')) setSelectedBrand('hanjin');
             else setSelectedBrand('etc');
-
         } catch (error) {
             console.error(error);
             alert('AI 분석 중 오류가 발생했습니다.');
@@ -152,16 +147,19 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
         }
     };
 
+    // ✅ Fix: scrollWidth/scrollHeight 명시로 저장 시 잘림 방지
+    const captureOptions = () => ({
+        scale: 2,
+        backgroundColor: '#ffffff',
+        width: previewRef.current?.scrollWidth ?? 650,
+        height: previewRef.current?.scrollHeight ?? 800,
+    });
+
     const handleDownload = async () => {
         if (!previewRef.current) return;
-
         setIsDownloading(true);
         try {
-            const dataUrl = await domToPng(previewRef.current, {
-                scale: 2,
-                backgroundColor: '#ffffff',
-            });
-
+            const dataUrl = await domToPng(previewRef.current, captureOptions());
             const link = document.createElement('a');
             link.download = `구인광고이미지_${activeBrand.name}_${new Date().getTime()}.png`;
             link.href = dataUrl;
@@ -176,19 +174,12 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
 
     const handleSaveToStorage = async () => {
         if (!previewRef.current || !isLoggedIn) return;
-
         setIsSavingToStorage(true);
         try {
-            const dataUrl = await domToPng(previewRef.current, {
-                scale: 2,
-                backgroundColor: '#ffffff',
-            });
-
-            // Data URL to Blob
+            const dataUrl = await domToPng(previewRef.current, captureOptions());
             const res = await fetch(dataUrl);
             const blob = await res.blob();
             const file = new File([blob], `구인광고_${activeBrand.name}_${Date.now()}.png`, { type: 'image/png' });
-
             await uploadImage(file);
             alert('저장파일 탭에 성공적으로 저장되었습니다!');
         } catch (error) {
@@ -201,34 +192,34 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
 
     if (!isOpen) return null;
 
+    const scaleValue = zoomLevel / 100;
+
+    // agency, description 제외하고 카드 표시
+    const cardFields: (keyof RecruitData)[] = [
+        'courier', 'delivery_address', 'terminal_address',
+        'delivery_ratio', 'income', 'sorting_helper',
+        'working_hours', 'license', 'deadline', 'contact'
+    ];
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 md:p-4">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose}></div>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
 
-            <div className={`relative transition-all duration-300 ease-in-out bg-white shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-200 ${isFullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-7xl h-[95vh] rounded-3xl'
-                }`}>
-                {/* Left: Editor */}
+            <div className="relative w-full max-w-7xl h-[95vh] rounded-3xl bg-white shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-200">
+
+                {/* ───────── 왼쪽: 에디터 ───────── */}
                 <div className="w-full md:w-1/2 flex flex-col border-r border-gray-100 bg-gray-50/50 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
+                    <div className="px-6 py-4 border-b border-gray-100 flex items-center bg-white shrink-0">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-600">
                                 <ImageIcon className="w-4 h-4" />
                             </div>
                             <h3 className="font-bold text-gray-900 text-lg">AI 이미지 메이커</h3>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setIsFullscreen(!isFullscreen)}
-                                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
-                                title={isFullscreen ? "축소" : "전체화면"}
-                            >
-                                {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-                            </button>
-                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                        {/* Text Input & AI Button */}
+                        {/* 공고 입력 */}
                         <div className="space-y-4">
                             <label className="text-sm font-bold text-gray-400 flex items-center justify-between">
                                 <div className="flex items-center gap-2"><Type className="w-4 h-4" /> 공고 내용 입력</div>
@@ -238,7 +229,7 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors disabled:opacity-50"
                                 >
                                     {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                    AI 분석 및 자동 채우기
+                                    AI 분석
                                 </button>
                             </label>
                             <textarea
@@ -246,10 +237,10 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
                                 placeholder="카톡이나 카페의 구인글을 붙여넣으세요..."
                                 value={inputText}
                                 onChange={(e) => setInputText(e.target.value)}
-                            ></textarea>
+                            />
                         </div>
 
-                        {/* Brand Selection */}
+                        {/* 브랜드 선택 */}
                         <div className="space-y-4">
                             <label className="text-sm font-bold text-gray-400 flex items-center gap-2">
                                 <ImageIcon className="w-4 h-4" /> 회사 스타일 선택
@@ -275,47 +266,50 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
                             </div>
                         </div>
 
-                        {/* Manual Edit Fields */}
+                        {/* ✅ Fix: description 포함 전체 필드 수정 가능 */}
                         {recruitData && (
                             <div className="space-y-4 animate-in slide-in-from-top-4 duration-300">
                                 <label className="text-sm font-bold text-gray-400 flex items-center gap-2">
                                     <Check className="w-4 h-4" /> 내용 수정
                                 </label>
                                 <div className="grid grid-cols-1 gap-2">
-                                    {Object.entries(recruitData).map(([key, value]) => (
-                                        key !== 'description' && (
-                                            <div key={key} className="flex flex-col">
-                                                <span className="text-[10px] text-gray-400 font-bold ml-1 mb-1">
-                                                    {FIELD_LABELS[key as keyof RecruitData]}
-                                                </span>
+                                    {(Object.keys(recruitData) as (keyof RecruitData)[]).map((key) => (
+                                        <div key={key} className="flex flex-col">
+                                            <span className="text-[10px] text-gray-400 font-bold ml-1 mb-1">
+                                                {FIELD_LABELS[key]}
+                                            </span>
+                                            {key === 'description' ? (
+                                                <textarea
+                                                    rows={4}
+                                                    value={recruitData[key]}
+                                                    onChange={(e) => setRecruitData({ ...recruitData, [key]: e.target.value })}
+                                                    className="px-3 py-2 bg-white border border-gray-100 rounded-lg text-xs font-medium outline-none focus:border-blue-400 resize-none"
+                                                />
+                                            ) : (
                                                 <input
                                                     type="text"
-                                                    value={value}
+                                                    value={recruitData[key]}
                                                     onChange={(e) => setRecruitData({ ...recruitData, [key]: e.target.value })}
                                                     className="px-3 py-2 bg-white border border-gray-100 rounded-lg text-xs font-medium outline-none focus:border-blue-400"
                                                 />
-                                            </div>
-                                        )
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             </div>
                         )}
                     </div>
 
+                    {/* 액션 버튼 */}
                     <div className="p-6 border-t border-gray-100 bg-white shadow-lg flex gap-3">
                         <button
                             onClick={handleDownload}
                             disabled={isDownloading || isSavingToStorage || !recruitData}
                             className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                         >
-                            {isDownloading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                                <Download className="w-5 h-5" />
-                            )}
+                            {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
                             <span>이미지 다운로드</span>
                         </button>
-
                         {isLoggedIn && (
                             <button
                                 onClick={handleSaveToStorage}
@@ -323,115 +317,248 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
                                 className="flex-[2] py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-2xl font-bold flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-xl shadow-blue-100"
                             >
                                 {isSavingToStorage ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        <span>저장 중...</span>
-                                    </>
+                                    <><Loader2 className="w-5 h-5 animate-spin" /><span>저장 중...</span></>
                                 ) : (
-                                    <>
-                                        <Save className="w-5 h-5" />
-                                        <span>내 저장공간에 저장하기</span>
-                                    </>
+                                    <><Save className="w-5 h-5" /><span>내 저장공간에 저장하기</span></>
                                 )}
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* Right: Preview (Fixed 650px Wide, Dynamic Height) */}
-                <div className="w-full md:w-1/2 bg-[#f0f2f5] flex items-center justify-center p-4 md:p-10 overflow-auto border-l border-gray-100 relative">
-                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-md hover:bg-white rounded-full transition-colors text-gray-500 z-50">
-                        <X className="w-5 h-5" />
-                    </button>
+                {/* ───────── 오른쪽: 미리보기 ───────── */}
+                <div className="w-full md:w-1/2 bg-[#f0f2f5] flex flex-col overflow-hidden border-l border-gray-100">
 
-                    <div className="scale-[0.4] sm:scale-[0.5] md:scale-[0.6] lg:scale-[0.7] xl:scale-90 origin-center transition-transform">
+                    {/* 줌 컨트롤 바 */}
+                    <div className="shrink-0 px-5 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-100 flex items-center justify-between z-10">
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setZoomLevel(z => Math.max(30, z - 10))}
+                                disabled={zoomLevel <= 30}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors disabled:opacity-40"
+                            >
+                                <ZoomOut className="w-4 h-4" />
+                            </button>
+                            <span className="text-xs font-bold text-gray-500 w-12 text-center tabular-nums">{zoomLevel}%</span>
+                            <button
+                                onClick={() => setZoomLevel(z => Math.min(120, z + 10))}
+                                disabled={zoomLevel >= 120}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors disabled:opacity-40"
+                            >
+                                <ZoomIn className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setZoomLevel(70)}
+                                className="px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-400 text-[10px] font-bold transition-colors"
+                            >
+                                초기화
+                            </button>
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* 스크롤 가능한 미리보기 */}
+                    <div className="flex-1 overflow-auto flex items-start justify-center p-8">
                         <div
-                            ref={previewRef}
-                            className="w-[650px] min-h-[850px] max-h-[1200px] flex flex-col bg-white overflow-hidden shadow-2xl relative"
+                            style={{ transform: `scale(${scaleValue})`, transformOrigin: 'top center' }}
+                            className="transition-transform duration-150"
                         >
-                            {/* Image Header */}
+                            {/* ✅ 포스터: inline style로 작성해 domToPng 캡처 시 스타일 누락 방지 */}
                             <div
-                                className="w-full h-28 flex items-center justify-between px-10 relative overflow-hidden"
-                                style={{ backgroundColor: activeBrand.secondaryColor }}
+                                ref={previewRef}
+                                style={{
+                                    width: '650px',
+                                    fontFamily: "'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif",
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    backgroundColor: '#ffffff',
+                                    overflow: 'visible',  // ✅ hidden → visible, 잘림 방지
+                                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                                }}
                             >
-                                <div className="absolute top-0 right-0 w-48 h-full bg-white/10 -skew-x-12 translate-x-12"></div>
-                                <div className="z-10 bg-white p-4 rounded-3xl shadow-xl w-28 h-28 flex items-center justify-center translate-y-6">
-                                    <img src={activeBrand.logo} alt="Logo" className="w-full h-full object-contain" />
-                                </div>
-                                <div className="z-10 flex flex-col items-end">
-                                    <span className="text-white text-3xl font-black uppercase tracking-tighter">대리점 구인</span>
-                                    <div
-                                        className="w-20 h-1.5 rounded-full mt-2"
-                                        style={{ backgroundColor: activeBrand.accentColor || '#FFF' }}
-                                    ></div>
-                                </div>
-                            </div>
+                                {/* ── 헤더: translate 제거, 순수 flex 중앙정렬 ── */}
+                                <div style={{
+                                    backgroundColor: activeBrand.secondaryColor,
+                                    width: '100%',
+                                    height: '120px',
+                                    display: 'flex',
+                                    alignItems: 'center',          // ✅ 수직 완전 중앙
+                                    justifyContent: 'space-between',
+                                    padding: '0 40px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    boxSizing: 'border-box',
+                                }}>
+                                    {/* 장식 사선 */}
+                                    <div style={{
+                                        position: 'absolute', top: 0, right: 0,
+                                        width: '200px', height: '100%',
+                                        backgroundColor: 'rgba(255,255,255,0.08)',
+                                        transform: 'skewX(-12deg) translateX(48px)',
+                                        pointerEvents: 'none',
+                                    }} />
 
-                            {/* Main Body */}
-                            <div className="px-10 pt-20 pb-16 flex-1 flex flex-col">
-                                <div className="mb-12 text-center">
-                                    <h2
-                                        className="text-5xl font-black tracking-tighter mb-3"
-                                        style={{ color: activeBrand.secondaryColor }}
-                                    >
-                                        구인 모집 공고
-                                    </h2>
-                                    <p className="text-gray-400 font-bold text-base tracking-widest uppercase">Official Recruitment Notice</p>
+                                    {/* ✅ 로고: translate 없음, align-items center로 자연 중앙 */}
+                                    <div style={{
+                                        backgroundColor: '#ffffff',
+                                        borderRadius: '18px',
+                                        boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+                                        width: '84px',
+                                        height: '84px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '10px',
+                                        flexShrink: 0,
+                                    }}>
+                                        <img
+                                            src={activeBrand.logo}
+                                            alt="Logo"
+                                            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                                        />
+                                    </div>
+
+                                    {/* 타이틀: 대리점명 구인, 밑줄/배경색 없음 */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{
+                                            color: '#ffffff',
+                                            fontSize: '28px',
+                                            fontWeight: 900,
+                                            letterSpacing: '-1px',
+                                            lineHeight: 1,
+                                        }}>
+                                            {recruitData?.agency || '대리점'}
+                                        </span>
+                                        {/* ✅ "구인" 배지: 밑줄 없음, 배경만 accent 색상 */}
+                                        <span style={{
+                                            backgroundColor: activeBrand.accentColor || 'rgba(255,255,255,0.25)',
+                                            color: '#ffffff',
+                                            fontSize: '20px',
+                                            fontWeight: 800,
+                                            padding: '4px 14px',
+                                            borderRadius: '10px',
+                                            lineHeight: 1.4,
+                                            flexShrink: 0,
+                                        }}>
+                                            구인
+                                        </span>
+                                    </div>
                                 </div>
 
-                                {recruitData ? (
-                                    <div className="space-y-5 bg-gray-50/80 p-10 rounded-[40px] border border-gray-100 shadow-sm">
-                                        {[
-                                            { key: 'courier' },
-                                            { key: 'delivery_address' },
-                                            { key: 'terminal_address' },
-                                            { key: 'delivery_ratio' },
-                                            { key: 'income' },
-                                            { key: 'sorting_helper' },
-                                            { key: 'working_hours' },
-                                            { key: 'agency' },
-                                            { key: 'license' },
-                                            { key: 'deadline' },
-                                            { key: 'contact' },
-                                        ].map((item, i) => {
-                                            const value = recruitData[item.key as keyof RecruitData];
-                                            return value && (
-                                                <div key={i} className="flex items-start gap-4">
-                                                    <span className="text-base font-black text-gray-400 w-28 pt-0.5 whitespace-nowrap">
-                                                        □ {FIELD_LABELS[item.key as keyof RecruitData]} :
-                                                    </span>
-                                                    <span className="text-base font-extrabold text-[#1a1a1a] flex-1">
-                                                        {value}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
+                                {/* ── 본문 ── */}
+                                <div style={{ padding: '24px 32px 32px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                    {recruitData ? (
+                                        <>
+                                            {/* 카드 그리드 (아이콘 없음) */}
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                {cardFields.map((fieldKey) => {
+                                                    const value = recruitData[fieldKey];
+                                                    if (!value) return null;
+                                                    const isContact = fieldKey === 'contact';
+                                                    const isDeadline = fieldKey === 'deadline';
+                                                    const isIncome = fieldKey === 'income';
+                                                    const isFullWidth = isContact || isIncome;
 
-                                        {recruitData.description && (
-                                            <div className="mt-10 pt-8 border-t border-gray-200">
-                                                <span className="text-base font-black text-gray-400 block mb-4">□ 상세설명</span>
-                                                <p className="text-base font-bold text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                                    {recruitData.description}
-                                                </p>
+                                                    return (
+                                                        <div key={fieldKey} style={{
+                                                            gridColumn: isFullWidth ? '1 / -1' : undefined,
+                                                            backgroundColor: isContact
+                                                                ? (activeBrand.secondaryColor ?? '#004191') + '14'
+                                                                : isDeadline ? '#FFF7ED' : '#F9FAFB',
+                                                            border: `1.5px solid ${isContact
+                                                                ? (activeBrand.secondaryColor ?? '#004191') + '50'
+                                                                : isDeadline ? '#FDBA74' : '#EFEFEF'
+                                                                }`,
+                                                            borderRadius: '14px',
+                                                            padding: '12px 16px',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '4px',
+                                                        }}>
+                                                            <span style={{
+                                                                fontSize: '10px',
+                                                                fontWeight: 700,
+                                                                color: isContact ? (activeBrand.secondaryColor ?? '#004191') : '#9CA3AF',
+                                                                letterSpacing: '0.04em',
+                                                            }}>
+                                                                {FIELD_LABELS[fieldKey]}
+                                                            </span>
+                                                            <span style={{
+                                                                fontSize: isContact ? '17px' : '13px',
+                                                                fontWeight: 800,
+                                                                color: isContact ? (activeBrand.secondaryColor ?? '#004191') : '#1a1a1a',
+                                                                lineHeight: 1.35,
+                                                            }}>
+                                                                {value}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-100 rounded-[40px] p-16">
-                                        <Sparkles className="w-16 h-16 mb-6 opacity-30" />
-                                        <p className="text-xl font-bold">분석된 내용이 없습니다.</p>
-                                        <p className="text-base">내용을 입력하고 AI 분석을 눌러주세요.</p>
-                                    </div>
-                                )}
-                            </div>
 
-                            {/* Footer */}
-                            <div
-                                className="px-10 py-2 flex items-center justify-center"
-                                style={{ backgroundColor: '#f8fafc' }}
-                            >
-                                <div className="flex gap-4">
-                                    <div className="w-16 h-1 rounded-full bg-gray-200"></div>
+                                            {/* 상세설명 */}
+                                            {recruitData.description && (
+                                                <div style={{
+                                                    backgroundColor: '#F9FAFB',
+                                                    border: '1.5px solid #EFEFEF',
+                                                    borderRadius: '14px',
+                                                    padding: '14px 16px',
+                                                }}>
+                                                    <span style={{
+                                                        display: 'block',
+                                                        fontSize: '10px',
+                                                        fontWeight: 700,
+                                                        color: '#9CA3AF',
+                                                        letterSpacing: '0.04em',
+                                                        marginBottom: '8px',
+                                                    }}>
+                                                        상세설명
+                                                    </span>
+                                                    <p style={{
+                                                        fontSize: '12px',
+                                                        fontWeight: 600,
+                                                        color: '#374151',
+                                                        lineHeight: 1.75,
+                                                        whiteSpace: 'pre-wrap',
+                                                        margin: 0,
+                                                    }}>
+                                                        {recruitData.description}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div style={{
+                                            minHeight: '380px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#D1D5DB',
+                                            border: '2px dashed #F3F4F6',
+                                            borderRadius: '24px',
+                                            padding: '60px',
+                                        }}>
+                                            <p style={{ fontSize: '17px', fontWeight: 700, margin: '0 0 6px' }}>분석된 내용이 없습니다.</p>
+                                            <p style={{ fontSize: '13px', margin: 0 }}>내용을 입력하고 AI 분석을 눌러주세요.</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ── 푸터 ── */}
+                                <div style={{
+                                    padding: '10px 40px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '12px',
+                                    backgroundColor: (activeBrand.secondaryColor ?? '#004191') + '0D',
+                                }}>
+                                    <div style={{ width: '40px', height: '3px', borderRadius: '999px', backgroundColor: (activeBrand.secondaryColor ?? '#004191') + '40' }} />
+                                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#C9C9C9', letterSpacing: '0.15em' }}>tool-ai.kr</span>
+                                    <div style={{ width: '40px', height: '3px', borderRadius: '999px', backgroundColor: (activeBrand.secondaryColor ?? '#004191') + '40' }} />
                                 </div>
                             </div>
                         </div>

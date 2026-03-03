@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar as CalendarIcon, LogIn, ChevronLeft, ChevronRight, Users, Plus, Phone, ClipboardList, LayoutDashboard, Youtube  } from 'lucide-react';
+import { Calendar as CalendarIcon, LogIn, ChevronLeft, ChevronRight, Users, Plus, Phone, ClipboardList, LayoutDashboard, Youtube } from 'lucide-react';
 import { useScheduleData } from '@/hooks/useScheduleData';
 import { useAuth } from '@/context/auth-context';
 import { Schedule } from '@/types/schedule';
@@ -125,16 +125,16 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                     </button>
 
                     <button
-                     onClick={() => {
-                        if (userSchedule) {
-                            // 내 서비스 내부 이동은 기존처럼 router.push
-                            router.push(`/schedule/entrance/${userSchedule.shortId}`);
-                        } else {
-                            // 외부 링크(유튜브)는 새 탭에서 열기
-                            window.open('https://www.youtube.com/@%EC%9A%A9%EC%B9%B4%EC%95%B1', '_blank', 'noopener,noreferrer');
-                        }
-                    }}
-               
+                        onClick={() => {
+                            if (userSchedule) {
+                                // 내 서비스 내부 이동은 기존처럼 router.push
+                                router.push(`/schedule/entrance/${userSchedule.shortId}`);
+                            } else {
+                                // 외부 링크(유튜브)는 새 탭에서 열기
+                                window.open('https://www.youtube.com/@%EC%9A%A9%EC%B9%B4%EC%95%B1', '_blank', 'noopener,noreferrer');
+                            }
+                        }}
+
                         className="flex items-center justify-center gap-2 bg-gradient-to-r from-pink-300 to-pink-300 text-white w-full md:w-auto px-6 md:px-8 py-3 md:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         {userSchedule ? (
@@ -145,7 +145,7 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                         ) : (
                             <>
                                 <Youtube className="w-5 h-5" />
-                                유튜브 영상 보기 
+                                유튜브 영상 보기
                             </>
                         )}
                     </button>
@@ -153,7 +153,10 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                     {/* 정산입력 버튼 - PC에서만 표시 */}
                     {userSchedule && (
                         <button
-                            onClick={() => router.push(`/schedule/view/${userSchedule.shortId}`)}
+                            onClick={() => {
+                                const uid = userSchedule.id || user?.uid || (userSchedule as any).userId;
+                                router.push(`/schedule/view/${userSchedule.shortId}/settlement?uid=${uid}`);
+                            }}
                             className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-green-400 to-emerald-400 text-white px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -84,13 +84,12 @@ export default function ScheduleViewPage() {
     const [newMemberPhone, setNewMemberPhone] = useState('');
 
     // Admin modals
-    type AdminModal = 'settings' | 'changeName' | 'changePassword' | 'share' | 'settlement' | null;
+    type AdminModal = 'settings' | 'changeName' | 'changePassword' | 'share' | null;
     const [adminModal, setAdminModal] = useState<AdminModal>(null);
     const [adminNewName, setAdminNewName] = useState('');
     const [adminNewPw, setAdminNewPw] = useState('');
     const [adminConfirmPw, setAdminConfirmPw] = useState('');
     const [adminPwError, setAdminPwError] = useState('');
-    const [settlementMsg, setSettlementMsg] = useState('');
 
 
     // ── Load schedule data ───────────────────────────────────────────────────────
@@ -183,143 +182,6 @@ export default function ScheduleViewPage() {
         await updateDoc(doc(db, 'schedules', docId), { password: hashed });
         setAdminModal(null);
         setAdminNewPw(''); setAdminConfirmPw(''); setAdminPwError('');
-        alert('비밀번호가 변경되었습니다.');
-    };
-
-    const handleExcelUpload = () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.xlsx,.xls,.csv';
-        input.onchange = async () => {
-            const file = input.files?.[0];
-            if (!file || !docId) return;
-
-            if (window.confirm('입력하시겠습니까?')) {
-                try {
-                    const data = await file.arrayBuffer();
-                    const workbook = XLSX.read(data);
-                    const sheetName = workbook.SheetNames[0];
-                    const sheet = workbook.Sheets[sheetName];
-                    const rows = XLSX.utils.sheet_to_json(sheet) as any[];
-
-                    // Helper to normalize date to YYYY-MM-DD
-                    const normalizeDate = (val: any): string | null => {
-                        if (!val) return null;
-                        let d: Date;
-                        if (typeof val === 'number') {
-                            d = new Date((val - 25569) * 86400 * 1000);
-                        } else {
-                            const s = String(val).trim().replace(/[\./]/g, '-');
-                            d = new Date(s);
-                        }
-                        if (isNaN(d.getTime())) return null;
-                        const y = d.getFullYear();
-                        const m = String(d.getMonth() + 1).padStart(2, '0');
-                        const dd = String(d.getDate()).padStart(2, '0');
-                        return `${y}-${m}-${dd}`;
-                    };
-
-                    // Group updates by Year-Month
-                    const updatesByMonth: Record<string, any[]> = {};
-
-                    rows.forEach((row, idx) => {
-                        const dateKey = normalizeDate(row['날짜']);
-                        if (!dateKey) {
-                            console.warn(`Row ${idx + 1}: Missing or invalid date`, row['날짜']);
-                            return;
-                        }
-
-                        const yearMonth = dateKey.substring(0, 7);
-                        if (!updatesByMonth[yearMonth]) updatesByMonth[yearMonth] = [];
-
-                        updatesByMonth[yearMonth].push({
-                            dateKey,
-                            memberName: String(row['기사'] || '').trim(),
-                            del: Number(row['배송']) || 0,
-                            err: Number(row['배송2']) || 0,
-                            ret: Number(row['반품']) || 0,
-                            ret2: Number(row['반품2']) || 0,
-                            cvs: Number(row['편의점']) || 0,
-                            pick: Number(row['집하']) || 0,
-                        });
-                    });
-
-                    console.log('Grouped updates:', updatesByMonth);
-
-                    if (Object.keys(updatesByMonth).length === 0) {
-                        alert('가져올 데이터가 없거나 날짜 형식이 올바르지 않습니다.');
-                        return;
-                    }
-
-                    // Update Firestore per month
-                    for (const [ym, monthUpdates] of Object.entries(updatesByMonth)) {
-                        const perfDocId = `${shortId}_${ym}`;
-                        console.log(`Updating Firestore document: performance/${perfDocId}`);
-
-                        const ref = doc(db, 'performance', perfDocId);
-                        const snap = await getDoc(ref);
-
-                        let performanceData = snap.exists() ? snap.data() : {
-                            shortId,
-                            creatorUid: docId,
-                            yearMonth: ym,
-                            dailyData: {},
-                            monthlyTotal: {}
-                        };
-
-                        const dailyData = { ...(performanceData.dailyData || {}) };
-                        const monthlyTotal = { ...(performanceData.monthlyTotal || {}) };
-
-                        monthUpdates.forEach(upd => {
-                            const { dateKey, memberName, ...metrics } = upd;
-                            if (!memberName) return;
-
-                            if (!dailyData[dateKey]) dailyData[dateKey] = {};
-                            dailyData[dateKey][memberName] = metrics;
-                        });
-
-                        // Re-calculate monthly totals
-                        const affectedMembers = new Set(monthUpdates.map(u => u.memberName));
-                        affectedMembers.forEach(m => {
-                            if (!m) return;
-                            const total = { del: 0, err: 0, ret: 0, ret2: 0, cvs: 0, pick: 0 };
-                            Object.entries(dailyData).forEach(([dKey, membersMap]: [string, any]) => {
-                                if (dKey.startsWith(ym) && membersMap[m]) {
-                                    const mData = membersMap[m];
-                                    total.del += Number(mData.del || 0);
-                                    total.err += Number(mData.err || 0);
-                                    total.ret += Number(mData.ret || 0);
-                                    total.ret2 += Number(mData.ret2 || 0);
-                                    total.cvs += Number(mData.cvs || 0);
-                                    total.pick += Number(mData.pick || 0);
-                                }
-                            });
-                            monthlyTotal[m] = total;
-                        });
-
-                        await setDoc(ref, {
-                            ...performanceData,
-                            dailyData,
-                            monthlyTotal
-                        }, { merge: true });
-                        console.log(`Firestore update successful for ${perfDocId}`);
-                    }
-
-                    setSettlementMsg('입력 되었습니다.');
-                } catch (err) {
-                    console.error('Excel upload error:', err);
-                    setSettlementMsg('업로드 중 오류가 발생했습니다.');
-                }
-            }
-        };
-        input.click();
-    };
-
-    const handleDownloadFormat = () => {
-        const a = document.createElement('a');
-        a.href = '/data/yongca_format.xlsx';
-        a.download = 'yongca_format.xlsx';
-        a.click();
     };
 
     // ── Member management ────────────────────────────────────────────────────────
@@ -542,7 +404,7 @@ export default function ScheduleViewPage() {
                                             {isAdmin && (
                                                 <>
                                                     <button
-                                                        onClick={() => { setSettlementMsg(''); setAdminModal('settlement'); }}
+                                                        onClick={() => router.push(`/schedule/view/${shortId}/settlement?uid=${docId}`)}
                                                         className="w-full mb-2 py-2.5 rounded-xl border-2 border-dashed border-[#059c13] text-[#059c13] text-sm font-semibold hover:bg-green-50 transition-colors"
                                                     >
                                                         + 정산 입력
@@ -817,7 +679,7 @@ export default function ScheduleViewPage() {
                                             {isAdmin && (
                                                 <div className="flex gap-2 mb-4">
                                                     <button
-                                                        onClick={() => { setSettlementMsg(''); setAdminModal('settlement'); }}
+                                                        onClick={() => router.push(`/schedule/view/${shortId}/settlement?uid=${docId}`)}
                                                         className="flex-1 py-2.5 rounded-xl border border-green-200 bg-green-50/50 text-green-700 text-[11px] font-bold"
                                                     >
                                                         정산 입력
@@ -953,7 +815,7 @@ export default function ScheduleViewPage() {
                     {isAdmin && (
                         <>
                             <button
-                                onClick={() => { setSettlementMsg(''); setAdminModal('settlement'); }}
+                                onClick={() => router.push(`/schedule/view/${shortId}/settlement?uid=${docId}`)}
                                 className="w-full mb-2 py-2.5 rounded-xl border-2 border-dashed border-[#059c13] text-[#059c13] text-sm font-semibold hover:bg-green-50 transition-colors"
                             >
                                 + 정산 입력
@@ -1147,33 +1009,7 @@ export default function ScheduleViewPage() {
             )}
 
             {/* ── Admin: Settlement Modal ───────────────────────────────────── */}
-            {adminModal === 'settlement' && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-sm p-6">
-                        <h3 className="font-bold text-lg mb-2">정산 관리</h3>
-                        <p className="text-xs text-gray-500 mb-5">
-                            엑셀 파일을 업로드하여 정산 데이터를 일괄 등록하거나, 업로드 양식을 다운로드할 수 있습니다.
-                        </p>
-                        {settlementMsg && (
-                            <div className="bg-green-50 border border-green-200 text-green-700 text-xs p-3 rounded-xl mb-4">
-                                {settlementMsg}
-                            </div>
-                        )}
-                        <div className="space-y-3 mb-4">
-                            <button onClick={handleExcelUpload}
-                                className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors">
-                                📤 엑셀 업로드
-                            </button>
-                            <button onClick={handleDownloadFormat}
-                                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-blue-500 text-blue-600 rounded-xl font-bold hover:bg-blue-50 transition-colors">
-                                📥 양식 다운로드
-                            </button>
-                        </div>
-                        <button onClick={() => setAdminModal(null)}
-                            className="w-full py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-colors">닫기</button>
-                    </div>
-                </div>
-            )}
+
 
             {/* 공지사항 상세 다이얼로그 */}
             {selectedNotice && (
