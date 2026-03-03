@@ -151,20 +151,23 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                     </button>
 
                     {/* 정산입력 버튼 - PC에서만 표시 */}
-                    {userSchedule && (
-                        <button
-                            onClick={() => {
+                    <button
+                        onClick={() => {
+                            if (userSchedule) {
                                 const uid = userSchedule.id || user?.uid || (userSchedule as any).userId;
                                 router.push(`/schedule/view/${userSchedule.shortId}/settlement?uid=${uid}`);
-                            }}
-                            className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-green-400 to-emerald-400 text-white px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                            정산 엑셀 입력
-                        </button>
-                    )}
+                            } else {
+                                // 일정표가 없는 경우 일정표 생성 페이지로 이동
+                                router.push('/schedule/create');
+                            }
+                        }}
+                        className="hidden sm:flex items-center justify-center gap-2 bg-gradient-to-r from-green-400 to-emerald-400 text-white w-full md:w-auto px-6 md:px-8 py-3 md:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        {userSchedule ? '팀원 정산 내역' : '정산 기능 사용하기'}
+                    </button>
                 </div>
             </div>
 

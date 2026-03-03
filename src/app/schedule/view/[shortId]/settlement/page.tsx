@@ -5,11 +5,11 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { doc, getDoc, setDoc, onSnapshot, collection, query, where, limit, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
-import { ChevronLeft, ChevronRight, Save, Loader2, Calendar as CalendarIcon, User, Settings2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, Loader2, Calendar as CalendarIcon, User, Settings2, Edit3, Check, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 // ─── Column definitions ───────────────────────────────────────────────────────
-const COLUMNS = [
+const DEFAULT_COLUMNS = [
     { key: 'del', label: '배송' },
     { key: 'err', label: '배송2' },
     { key: 'ret', label: '반품' },
@@ -21,6 +21,7 @@ const COLUMNS = [
 const WEEKDAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
 type DailyData = Record<string, Record<string, Record<string, any>>>; // dateKey → memberName → colKey → value
+type YearlyData = Record<string, Record<string, Record<string, number>>>; // memberName → month → colKey → value
 
 function getDocId(shortId: string, year: number, month: number) {
     return `${shortId}_${year}-${String(month).padStart(2, '0')}`;
@@ -51,13 +52,24 @@ export default function TeamSettlementPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [adminModal, setAdminModal] = useState<'settlement' | null>(null);
     const [settlementMsg, setSettlementMsg] = useState('');
+    
+    // Dynamic column labels
+    const [columns, setColumns] = useState(DEFAULT_COLUMNS);
+    const [editingColumn, setEditingColumn] = useState<string | null>(null);
+    const [tempLabel, setTempLabel] = useState('');
+    
+    // Monthly view states
+    const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
+    const [focusedYear, setFocusedYear] = useState(new Date().getFullYear());
+    const [yearlyData, setYearlyData] = useState<YearlyData>({});
+    const [isLoadingYearly, setIsLoadingYearly] = useState(false);
 
     const year = focusedDate.getFullYear();
     const month = focusedDate.getMonth() + 1;
     const dateKey = formatDateKey(focusedDate);
     const docId = getDocId(shortId, year, month);
 
-    // ── Load Schedule (to get members) ──────────────────────────────────────────
+    // ── Load Schedule (to get members and column labels) ──────────────────────────────────────────
     useEffect(() => {
         async function loadSchedule() {
             const q = query(collection(db, 'schedules'), where('shortId', '==', shortId), limit(1));
@@ -65,6 +77,17 @@ export default function TeamSettlementPage() {
             if (!snap.empty) {
                 const data = snap.docs[0].data();
                 setMembers(data.members || []);
+                
+                // Load custom column labels if they exist
+                if (data.columnLabels) {
+                    const customColumns = DEFAULT_COLUMNS.map(col => ({
+                        ...col,
+                        label: data.columnLabels[col.key] || col.label
+                    }));
+                    setColumns(customColumns);
+                } else {
+                    setColumns(DEFAULT_COLUMNS);
+                }
             }
         }
         loadSchedule();
@@ -93,6 +116,100 @@ export default function TeamSettlementPage() {
         const next = new Date(focusedDate);
         next.setDate(next.getDate() + offset);
         setFocusedDate(next);
+    };
+
+    const changeYear = (offset: number) => {
+        setFocusedYear(prev => prev + offset);
+    };
+
+    // ── Load yearly data for monthly view ──────────────────────────────────────────
+    const loadYearlyData = async (year: number) => {
+        console.log(`연간 데이터 로드 시작: ${year}년`);
+        setIsLoadingYearly(true);
+        try {
+            const yearlyData: YearlyData = {};
+            
+            // Load data for all 12 months
+            for (let month = 1; month <= 12; month++) {
+                const monthStr = String(month).padStart(2, '0');
+                const docId = `${shortId}_${year}-${monthStr}`;
+                
+                console.log(`문서 확인 중: ${docId}`);
+                const snap = await getDoc(doc(db, 'performance', docId));
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const monthlyTotal = data.monthlyTotal || {};
+                    console.log(`${docId} 데이터 발견:`, monthlyTotal);
+                    
+                    // Store each member's monthly totals
+                    Object.entries(monthlyTotal).forEach(([memberName, totals]: [string, any]) => {
+                        if (!yearlyData[memberName]) {
+                            yearlyData[memberName] = {};
+                        }
+                        yearlyData[memberName][monthStr] = totals || {};
+                    });
+                } else {
+                    console.log(`${docId} 문서 없음`);
+                }
+            }
+            
+            console.log('최종 연간 데이터:', yearlyData);
+            setYearlyData(yearlyData);
+        } catch (error) {
+            console.error('연간 데이터 로드 실패:', error);
+        } finally {
+            setIsLoadingYearly(false);
+        }
+    };
+
+    // Load yearly data when switching to monthly view or changing year
+    useEffect(() => {
+        if (viewMode === 'monthly') {
+            loadYearlyData(focusedYear);
+        }
+    }, [viewMode, focusedYear, shortId]);
+
+    // ── Column label management ──────────────────────────────────────────────────
+    const startEditingColumn = (columnKey: string, currentLabel: string) => {
+        setEditingColumn(columnKey);
+        setTempLabel(currentLabel);
+    };
+
+    const cancelEditingColumn = () => {
+        setEditingColumn(null);
+        setTempLabel('');
+    };
+
+    const saveColumnLabel = async (columnKey: string) => {
+        if (!tempLabel.trim()) {
+            cancelEditingColumn();
+            return;
+        }
+
+        try {
+            // Update local state
+            const updatedColumns = columns.map(col => 
+                col.key === columnKey ? { ...col, label: tempLabel.trim() } : col
+            );
+            setColumns(updatedColumns);
+
+            // Save to Firestore
+            const q = query(collection(db, 'schedules'), where('shortId', '==', shortId), limit(1));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                const docRef = snap.docs[0].ref;
+                const columnLabels = Object.fromEntries(
+                    updatedColumns.map(col => [col.key, col.label])
+                );
+                await updateDoc(docRef, { columnLabels });
+            }
+
+            setEditingColumn(null);
+            setTempLabel('');
+        } catch (error) {
+            console.error('컬럼 라벨 저장 실패:', error);
+            alert('라벨 저장에 실패했습니다.');
+        }
     };
 
     // ── Cell update (local only while editing) ────────────────────────────────
@@ -124,7 +241,7 @@ export default function TeamSettlementPage() {
 
             // Reset totals for all known members
             members.forEach(m => {
-                monthlyTotal[m.name] = Object.fromEntries(COLUMNS.map(c => [c.key, 0]));
+                monthlyTotal[m.name] = Object.fromEntries(columns.map(c => [c.key, 0]));
             });
 
             // Iterate through every date in the month stored in allDailyData
@@ -132,9 +249,9 @@ export default function TeamSettlementPage() {
                 if (dKey.startsWith(monthPrefix)) {
                     for (const [mName, cols] of Object.entries(membersMap as Record<string, Record<string, any>>)) {
                         if (!monthlyTotal[mName]) {
-                            monthlyTotal[mName] = Object.fromEntries(COLUMNS.map(c => [c.key, 0]));
+                            monthlyTotal[mName] = Object.fromEntries(columns.map(c => [c.key, 0]));
                         }
-                        for (const col of COLUMNS) {
+                        for (const col of columns) {
                             const val = parseInt(cols[col.key] ?? '0') || 0;
                             monthlyTotal[mName][col.key] += val;
                         }
@@ -170,11 +287,13 @@ export default function TeamSettlementPage() {
 
             if (window.confirm('입력하시겠습니까?')) {
                 try {
+                    console.log('엑셀 업로드 시작');
                     const data = await file.arrayBuffer();
                     const workbook = XLSX.read(data);
                     const sheetName = workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
                     const rows = XLSX.utils.sheet_to_json(sheet) as any[];
+                    console.log('엑셀 데이터 읽기 완료:', rows.length, '행');
 
                     // Helper to normalize date to YYYY-MM-DD
                     const normalizeDate = (val: any): string | null => {
@@ -197,34 +316,85 @@ export default function TeamSettlementPage() {
                     const updatesByMonth: Record<string, any[]> = {};
 
                     rows.forEach((row, idx) => {
+                        console.log(`처리 중인 행 ${idx + 1}:`, row);
                         const dateK = normalizeDate(row['날짜']);
-                        if (!dateK) return;
+                        if (!dateK) {
+                            console.log(`행 ${idx + 1}: 날짜 파싱 실패`, row['날짜']);
+                            return;
+                        }
 
                         const ym = dateK.substring(0, 7);
                         if (!updatesByMonth[ym]) updatesByMonth[ym] = [];
 
-                        updatesByMonth[ym].push({
+                        // 동적 컬럼 매핑: 사용자 라벨 또는 고정 키로 데이터 읽기
+                        const rowData: any = {
                             dateKey: dateK,
                             memberName: String(row['기사'] || '').trim(),
-                            del: Number(row['배송']) || 0,
-                            err: Number(row['배송2']) || 0,
-                            ret: Number(row['반품']) || 0,
-                            ret2: Number(row['반품2']) || 0,
-                            cvs: Number(row['편의점']) || 0,
-                            pick: Number(row['집하']) || 0,
+                        };
+                        console.log(`행 ${idx + 1}: 날짜=${dateK}, 기사=${rowData.memberName}`);
+
+                        // 각 컬럼에 대해 여러 방식으로 데이터 읽기 시도
+                        columns.forEach(col => {
+                            let value = 0;
+                            let foundMethod = 'none';
+                            
+                            // 1. 고정 키로 읽기 (del, err 등)
+                            if (row[col.key]) {
+                                value = Number(row[col.key]) || 0;
+                                foundMethod = 'key';
+                            }
+                            // 2. 템플릿 형식으로 읽기 (del - 박스 등)
+                            else if (row[`${col.key} - ${col.label}`]) {
+                                value = Number(row[`${col.key} - ${col.label}`]) || 0;
+                                foundMethod = 'template';
+                            }
+                            // 3. 현재 라벨로 읽기 (박스, 봉지 등)
+                            else if (row[col.label]) {
+                                value = Number(row[col.label]) || 0;
+                                foundMethod = 'label';
+                            }
+                            // 4. 기본 라벨로 읽기 (배송, 배송2 등) - 하위 호환성
+                            else {
+                                const defaultCol = DEFAULT_COLUMNS.find(dc => dc.key === col.key);
+                                if (defaultCol && row[defaultCol.label]) {
+                                    value = Number(row[defaultCol.label]) || 0;
+                                    foundMethod = 'default';
+                                }
+                            }
+                            // 5. 패턴 매칭으로 읽기 (del - 임의문자 형식)
+                            if (foundMethod === 'none') {
+                                // 모든 컬럼명에서 "del - " 패턴 찾기
+                                const pattern = `${col.key} - `;
+                                const matchingKey = Object.keys(row).find(key => key.startsWith(pattern));
+                                if (matchingKey && row[matchingKey]) {
+                                    value = Number(row[matchingKey]) || 0;
+                                    foundMethod = 'pattern';
+                                }
+                            }
+                            
+                            console.log(`  컬럼 ${col.key}(${col.label}): ${value} (방식: ${foundMethod})`);
+                            rowData[col.key] = value;
                         });
+
+                        updatesByMonth[ym].push(rowData);
+                        console.log(`행 ${idx + 1} 처리 완료:`, rowData);
                     });
 
+                    console.log('월별 업데이트 데이터:', updatesByMonth);
+                    
                     if (Object.keys(updatesByMonth).length === 0) {
                         alert('가져올 데이터가 없거나 날짜 형식이 올바르지 않습니다.');
                         return;
                     }
 
                     // Update Firestore per month
+                    console.log('Firestore 업데이트 시작');
                     for (const [ym, monthUpdates] of Object.entries(updatesByMonth)) {
+                        console.log(`${ym} 월 업데이트 시작:`, monthUpdates.length, '건');
                         const perfDocId = `${shortId}_${ym}`;
                         const ref = doc(db, 'performance', perfDocId);
                         const snap = await getDoc(ref);
+                        console.log(`문서 ${perfDocId} 존재:`, snap.exists());
 
                         let performanceData = snap.exists() ? snap.data() : {
                             shortId,
@@ -249,32 +419,39 @@ export default function TeamSettlementPage() {
                         const affectedMembers = new Set(monthUpdates.map(u => u.memberName));
                         affectedMembers.forEach(m => {
                             if (!m) return;
-                            const total = { del: 0, err: 0, ret: 0, ret2: 0, cvs: 0, pick: 0 };
+                            const total: Record<string, number> = {};
+                            
+                            // 동적 컬럼에 대해 합계 계산
+                            columns.forEach(col => {
+                                total[col.key] = 0;
+                            });
+                            
                             Object.entries(dailyD).forEach(([dKy, membersMap]: [string, any]) => {
                                 if (dKy.startsWith(ym) && membersMap[m]) {
                                     const md = membersMap[m];
-                                    total.del += Number(md.del || 0);
-                                    total.err += Number(md.err || 0);
-                                    total.ret += Number(md.ret || 0);
-                                    total.ret2 += Number(md.ret2 || 0);
-                                    total.cvs += Number(md.cvs || 0);
-                                    total.pick += Number(md.pick || 0);
+                                    columns.forEach(col => {
+                                        total[col.key] += Number(md[col.key] || 0);
+                                    });
                                 }
                             });
                             monthlyT[m] = total;
                         });
 
+                        console.log(`${ym} 월 Firestore 저장 시작`);
                         await setDoc(ref, {
                             ...performanceData,
                             dailyData: dailyD,
                             monthlyTotal: monthlyT
                         }, { merge: true });
+                        console.log(`${ym} 월 Firestore 저장 완료`);
                     }
 
+                    console.log('엑셀 업로드 전체 완료');
                     setSettlementMsg('입력 되었습니다.');
                 } catch (err) {
                     console.error('Excel upload error:', err);
-                    setSettlementMsg('업로드 중 오류가 발생했습니다.');
+                    const errorMessage = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다';
+                    setSettlementMsg('업로드 중 오류가 발생했습니다: ' + errorMessage);
                 }
             }
         };
@@ -282,10 +459,61 @@ export default function TeamSettlementPage() {
     };
 
     const handleDownloadFormat = () => {
-        const a = document.createElement('a');
-        a.href = '/data/yongca_format.xlsx';
-        a.download = 'yongca_format.xlsx';
-        a.click();
+        try {
+            // 동적 헤더 생성
+            const headers = [
+                '날짜',
+                '기사',
+                ...columns.map(col => `${col.key} - ${col.label}`)
+            ];
+
+            // 샘플 데이터 생성
+            const sampleData = [
+                headers,
+                ['2026-01-01', '홍길동', ...columns.map(() => '0')],
+                ['2026-01-02', '김철수', ...columns.map(() => '0')],
+                ['', '', ...columns.map(() => '')], // 빈 행
+                ['📌 사용법:', '', '', '', '', '', '', ''],
+                ['1. 날짜: YYYY-MM-DD 형식 (예: 2026-01-01)', '', '', '', '', '', '', ''],
+                ['2. 기사: 팀원 이름', '', '', '', '', '', '', ''],
+                [`3. ${columns.map(col => `${col.key}(${col.label})`).join(', ')}: 숫자만 입력`, '', '', '', '', '', '', ''],
+                ['4. 빈 셀은 0으로 처리됩니다', '', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', ''],
+                ['⚠️ 중요 사항:', '', '', '', '', '', '', ''],
+                [`${columns.map(col => `${col.key} -`).join(', ')} 위 카테고리명은 삭제하시면 안됩니다.`, '', '', '', '', '', '', ''],
+                [`${columns.map(col => `${col.key} - 희망카테고리명`).join(', ')} (희망카테고리는 이렇게 사용하세요)`, '', '', '', '', '', '', ''],
+            ];
+
+            // 엑셀 파일 생성
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(sampleData);
+            
+            // 컬럼 너비 설정
+            const colWidths = [
+                { wch: 12 }, // 날짜
+                { wch: 10 }, // 기사
+                ...columns.map(() => ({ wch: 12 })) // 각 컬럼
+            ];
+            ws['!cols'] = colWidths;
+
+            XLSX.utils.book_append_sheet(wb, ws, '정산 템플릿');
+            
+            // 파일 다운로드
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([wbout], { type: 'application/octet-stream' });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `정산_업로드_템플릿_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('템플릿 생성 실패:', error);
+            alert('템플릿 생성에 실패했습니다.');
+        }
     };
 
     const getColumnTotal = (colKey: string) => {
@@ -335,33 +563,83 @@ export default function TeamSettlementPage() {
                 )}
             </header>
 
-            {/* Date navigation */}
-            <div className="bg-white border-b border-gray-100 flex items-center justify-between px-4 py-4 flex-shrink-0">
-                <button onClick={() => changeDate(-1)} className="p-2 rounded-2xl border border-gray-100 hover:bg-blue-50 text-[#42A5F5] transition-all">
-                    <ChevronLeft size={20} />
-                </button>
-                <div className="flex flex-col items-center">
-                    <div className="flex items-center gap-2 text-gray-400 mb-0.5">
-                        <CalendarIcon size={12} />
-                        <span className="text-[10px] font-bold uppercase tracking-widest">Selected Date</span>
-                    </div>
-                    <span className="text-lg font-black text-gray-800">
-                        {year}년 {month}월 {focusedDate.getDate()}일 ({WEEKDAY_NAMES[focusedDate.getDay()]})
-                    </span>
+            {/* Navigation */}
+            <div className="bg-white border-b border-gray-100 px-4 py-4 flex-shrink-0">
+                {/* View Mode Toggle */}
+                <div className="flex items-center justify-center gap-2 mb-4">
+                    <button
+                        onClick={() => setViewMode('daily')}
+                        className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                            viewMode === 'daily' 
+                                ? 'bg-[#42A5F5] text-white shadow-md' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                    >
+                        일별보기
+                    </button>
+                    <button
+                        onClick={() => setViewMode('monthly')}
+                        className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                            viewMode === 'monthly' 
+                                ? 'bg-[#42A5F5] text-white shadow-md' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                    >
+                        월별보기
+                    </button>
                 </div>
-                <button onClick={() => changeDate(1)} className="p-2 rounded-2xl border border-gray-100 hover:bg-blue-50 text-[#42A5F5] transition-all">
-                    <ChevronRight size={20} />
-                </button>
+
+                {/* Date/Year Navigation */}
+                {viewMode === 'daily' ? (
+                    <div className="flex items-center justify-between">
+                        <button onClick={() => changeDate(-1)} className="p-2 rounded-2xl border border-gray-100 hover:bg-blue-50 text-[#42A5F5] transition-all">
+                            <ChevronLeft size={20} />
+                        </button>
+                        <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-2 text-gray-400 mb-0.5">
+                                <CalendarIcon size={12} />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Selected Date</span>
+                            </div>
+                            <span className="text-lg font-black text-gray-800">
+                                {year}년 {month}월 {focusedDate.getDate()}일 ({WEEKDAY_NAMES[focusedDate.getDay()]})
+                            </span>
+                        </div>
+                        <button onClick={() => changeDate(1)} className="p-2 rounded-2xl border border-gray-100 hover:bg-blue-50 text-[#42A5F5] transition-all">
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex items-center justify-between">
+                        <button onClick={() => changeYear(-1)} className="p-2 rounded-2xl border border-gray-100 hover:bg-blue-50 text-[#42A5F5] transition-all">
+                            <ChevronLeft size={20} />
+                        </button>
+                        <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-2 text-gray-400 mb-0.5">
+                                <CalendarIcon size={12} />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Selected Year</span>
+                            </div>
+                            <span className="text-lg font-black text-gray-800">
+                                {focusedYear}년 연간 합계
+                            </span>
+                        </div>
+                        <button onClick={() => changeYear(1)} className="p-2 rounded-2xl border border-gray-100 hover:bg-blue-50 text-[#42A5F5] transition-all">
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                )}
             </div>
 
-            {isLoading ? (
+            {(viewMode === 'daily' ? isLoading : isLoadingYearly) ? (
                 <div className="flex-1 flex items-center justify-center">
                     <div className="flex flex-col items-center gap-3 text-gray-400">
                         <Loader2 className="w-10 h-10 text-[#42A5F5] animate-spin" />
-                        <p className="text-sm font-medium">데이터 로딩 중...</p>
+                        <p className="text-sm font-medium">
+                            {viewMode === 'daily' ? '데이터 로딩 중...' : '연간 데이터 로딩 중...'}
+                        </p>
                     </div>
                 </div>
-            ) : (
+            ) : viewMode === 'monthly' ? (
+                // Monthly View
                 <div className="flex-1 overflow-auto">
                     <div className="min-w-full inline-block align-middle">
                         <table className="min-w-full border-collapse">
@@ -370,9 +648,133 @@ export default function TeamSettlementPage() {
                                     <th className="sticky left-0 z-20 bg-gray-50/50 py-4 px-3 text-left text-xs font-black text-gray-400 border-b border-gray-100 min-w-[100px]">
                                         팀원 이름
                                     </th>
-                                    {COLUMNS.map(col => (
+                                    {Array.from({length: 12}, (_, i) => (
+                                        <th key={i} className="py-4 px-2 text-center text-xs font-black text-[#42A5F5] border-b border-gray-100 min-w-[80px]">
+                                            {i + 1}월
+                                        </th>
+                                    ))}
+                                    <th className="py-4 px-2 text-center text-xs font-black text-red-600 border-b border-gray-100 min-w-[80px]">
+                                        연간 합계
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {members.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={14} className="py-20 text-center">
+                                            <div className="flex flex-col items-center gap-2 text-gray-300">
+                                                <User size={40} className="opacity-20" />
+                                                <p className="text-sm font-medium">등록된 팀원이 없습니다</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    members.map((member, idx) => {
+                                        const memberData = yearlyData[member.name] || {};
+                                        let yearTotal = 0;
+                                        
+                                        return (
+                                            <tr key={idx} className="border-b border-gray-50 hover:bg-blue-50/20 transition-colors">
+                                                <td className="sticky left-0 z-10 bg-white py-3 px-3 border-r border-gray-100">
+                                                    <div className="flex items-center gap-3">
+                                                        <div 
+                                                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                                                            style={{ backgroundColor: member.color || '#42A5F5' }}
+                                                        ></div>
+                                                        <span className="font-bold text-gray-700 text-sm truncate">{member.name}</span>
+                                                    </div>
+                                                </td>
+                                                {Array.from({length: 12}, (_, monthIndex) => {
+                                                    const monthStr = String(monthIndex + 1).padStart(2, '0');
+                                                    const monthData = memberData[monthStr] || {};
+                                                    const monthTotal = columns.reduce((sum, col) => 
+                                                        sum + (Number(monthData[col.key]) || 0), 0
+                                                    );
+                                                    yearTotal += monthTotal;
+                                                    
+                                                    return (
+                                                        <td key={monthIndex} className="px-2 py-3 text-center">
+                                                            <div className={`h-9 flex items-center justify-center rounded-lg text-sm font-medium border
+                                                                ${monthTotal > 0 
+                                                                    ? 'bg-blue-50 border-blue-100 text-gray-800' 
+                                                                    : 'bg-gray-50 border-gray-100 text-gray-300'
+                                                                }`}>
+                                                                {monthTotal > 0 ? monthTotal : '-'}
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td className="px-2 py-3 text-center">
+                                                    <div className={`h-9 flex items-center justify-center rounded-lg text-sm font-bold border-2
+                                                        ${yearTotal > 0 
+                                                            ? 'bg-red-50 border-red-200 text-red-700' 
+                                                            : 'bg-gray-50 border-gray-200 text-gray-300'
+                                                        }`}>
+                                                        {yearTotal > 0 ? yearTotal : '-'}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ) : (
+                // Daily View (기존 테이블)
+                <div className="flex-1 overflow-auto">
+                    <div className="min-w-full inline-block align-middle">
+                        <table className="min-w-full border-collapse">
+                            <thead>
+                                <tr className="bg-gray-50/50">
+                                    <th className="sticky left-0 z-20 bg-gray-50/50 py-4 px-3 text-left text-xs font-black text-gray-400 border-b border-gray-100 min-w-[100px]">
+                                        팀원 이름
+                                    </th>
+                                    {columns.map(col => (
                                         <th key={col.key} className="py-4 px-2 text-center text-xs font-black text-[#42A5F5] border-b border-gray-100 min-w-[80px] uppercase">
-                                            {col.label}
+                                            <div className="flex items-center justify-center gap-1">
+                                                {editingColumn === col.key ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="text"
+                                                            value={tempLabel}
+                                                            onChange={(e) => setTempLabel(e.target.value)}
+                                                            className="w-16 px-1 py-0.5 text-xs border rounded text-gray-700 text-center"
+                                                            autoFocus
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') saveColumnLabel(col.key);
+                                                                if (e.key === 'Escape') cancelEditingColumn();
+                                                            }}
+                                                        />
+                                                        <button
+                                                            onClick={() => saveColumnLabel(col.key)}
+                                                            className="p-0.5 hover:bg-green-100 rounded"
+                                                        >
+                                                            <Check className="w-3 h-3 text-green-600" />
+                                                        </button>
+                                                        <button
+                                                            onClick={cancelEditingColumn}
+                                                            className="p-0.5 hover:bg-red-100 rounded"
+                                                        >
+                                                            <X className="w-3 h-3 text-red-600" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <span>{col.label}</span>
+                                                        {isAdmin && (
+                                                            <button
+                                                                onClick={() => startEditingColumn(col.key, col.label)}
+                                                                className="p-0.5 hover:bg-blue-100 rounded opacity-60 hover:opacity-100 transition-opacity"
+                                                                title="라벨 편집"
+                                                            >
+                                                                <Edit3 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
                                         </th>
                                     ))}
                                     <th className="py-4 px-2 text-center text-xs font-black text-gray-400 border-b border-gray-100 min-w-[80px] uppercase">
@@ -383,7 +785,7 @@ export default function TeamSettlementPage() {
                             <tbody className="bg-white">
                                 {members.length === 0 ? (
                                     <tr>
-                                        <td colSpan={COLUMNS.length + 2} className="py-20 text-center">
+                                        <td colSpan={columns.length + 2} className="py-20 text-center">
                                             <div className="flex flex-col items-center gap-2 text-gray-300">
                                                 <User size={40} className="opacity-20" />
                                                 <p className="text-sm font-bold">등록된 팀원이 없습니다.</p>
@@ -393,7 +795,7 @@ export default function TeamSettlementPage() {
                                 ) : (
                                     members.map((member, idx) => {
                                         const mData = currentDayData[member.name] ?? {};
-                                        const rowTotal = COLUMNS.reduce((acc, col) => acc + (parseInt(mData[col.key] ?? '0') || 0), 0);
+                                        const rowTotal = columns.reduce((acc: number, col) => acc + (parseInt(mData[col.key] ?? '0') || 0), 0);
                                         return (
                                             <tr key={idx} className="border-b border-gray-50 hover:bg-blue-50/20 transition-colors">
                                                 <td className="sticky left-0 z-10 bg-white/80 backdrop-blur-md py-4 px-3 border-r border-gray-50">
@@ -407,7 +809,7 @@ export default function TeamSettlementPage() {
                                                         <span className="font-bold text-gray-700 text-sm truncate">{member.name}</span>
                                                     </div>
                                                 </td>
-                                                {COLUMNS.map(col => {
+                                                {columns.map(col => {
                                                     const value = mData[col.key] ?? '';
                                                     return (
                                                         <td key={col.key} className="px-2 py-3">
@@ -454,7 +856,7 @@ export default function TeamSettlementPage() {
                                         <td className="sticky left-0 z-30 bg-[#F0F7FF] py-4 px-4 text-center text-xs font-black text-blue-500 uppercase">
                                             전체 합계
                                         </td>
-                                        {COLUMNS.map(col => {
+                                        {columns.map(col => {
                                             const total = getColumnTotal(col.key);
                                             return (
                                                 <td key={col.key} className="py-4 px-2 text-center text-[15px] font-black text-blue-700">
@@ -467,7 +869,7 @@ export default function TeamSettlementPage() {
                                                 let grandTotal = 0;
                                                 members.forEach(member => {
                                                     const mData = currentDayData[member.name] ?? {};
-                                                    grandTotal += COLUMNS.reduce((acc, col) => acc + (parseInt(mData[col.key] ?? '0') || 0), 0);
+                                                    grandTotal += columns.reduce((acc: number, col) => acc + (parseInt(mData[col.key] ?? '0') || 0), 0);
                                                 });
                                                 return grandTotal > 0 ? grandTotal : '-';
                                             })()}
@@ -483,8 +885,13 @@ export default function TeamSettlementPage() {
             {/* Info Banner */}
             <div className="p-4 bg-blue-50/50 border-t border-blue-100 mt-auto">
                 <p className="text-[11px] text-blue-600 font-bold leading-relaxed text-center">
-                    💡 상단 날짜를 이동하며 팀 전체의 배송/반품 성과를 한눈에 입력할 수 있습니다.<br />
-                    입력 완료 후 우측 상단 '저장하기' 버튼을 꼭 눌러주세요.
+                    {viewMode === 'daily' ? (
+                        <>💡 상단 날짜를 이동하며 팀 전체의 배송/반품 성과를 한눈에 입력할 수 있습니다.<br />
+                        입력 완료 후 우측 상단 '저장하기' 버튼을 꼭 눌러주세요.</>
+                    ) : (
+                        <>📊 연간 월별 합계를 한눈에 확인할 수 있습니다.<br />
+                        각 월의 데이터는 일별보기에서 입력하실 수 있습니다.</>
+                    )}
                 </p>
             </div>
 
@@ -503,15 +910,24 @@ export default function TeamSettlementPage() {
                             </div>
                         )}
                         <div className="space-y-3 mb-6">
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                                <h4 className="font-bold text-blue-800 mb-2">업로드 방법</h4>
+                                <div className="text-sm text-blue-700 space-y-1">
+                                    <p>1. 엑셀 양식 다운로드</p>
+                                    <p>2. "엑셀 업로드"로 파일 업로드</p>
+                                </div>
+                            </div>
+                            
+                            <button onClick={handleDownloadFormat}
+                                className="w-full flex items-center justify-center gap-3 py-4 border-2 border-green-500 text-green-600 rounded-2xl font-bold hover:bg-green-50 transition-all active:scale-95">
+                                <span className="text-lg">📥</span>
+                                엑셀 양식 다운로드
+                            </button>
+                            
                             <button onClick={handleExcelUpload}
                                 className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95">
                                 <span className="text-lg">📤</span>
                                 엑셀 업로드
-                            </button>
-                            <button onClick={handleDownloadFormat}
-                                className="w-full flex items-center justify-center gap-3 py-4 border-2 border-blue-500 text-blue-600 rounded-2xl font-bold hover:bg-blue-50 transition-all active:scale-95">
-                                <span className="text-lg">📥</span>
-                                양식 다운로드
                             </button>
                         </div>
                         <button onClick={() => setAdminModal(null)}

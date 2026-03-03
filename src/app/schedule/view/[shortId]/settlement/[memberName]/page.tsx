@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
 
 // ─── Column definitions ───────────────────────────────────────────────────────
-const COLUMNS = [
+const DEFAULT_COLUMNS = [
     { key: 'del', label: '배송' },
     { key: 'err', label: '배송2' },
     { key: 'ret', label: '반품' },
@@ -44,9 +44,40 @@ export default function SettlementPage() {
     const [dailyData, setDailyData] = useState<DailyData>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // Dynamic column labels
+    const [columns, setColumns] = useState(DEFAULT_COLUMNS);
 
     const daysInMonth = new Date(focusedYear, focusedMonth, 0).getDate();
     const docId = getDocId(shortId, focusedYear, focusedMonth);
+
+    // ── Load column labels from schedule ──────────────────────────────────────────
+    useEffect(() => {
+        async function loadColumnLabels() {
+            try {
+                const q = query(collection(db, 'schedules'), where('shortId', '==', shortId), limit(1));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    const data = snap.docs[0].data();
+                    
+                    // Load custom column labels if they exist
+                    if (data.columnLabels) {
+                        const customColumns = DEFAULT_COLUMNS.map(col => ({
+                            ...col,
+                            label: data.columnLabels[col.key] || col.label
+                        }));
+                        setColumns(customColumns);
+                    } else {
+                        setColumns(DEFAULT_COLUMNS);
+                    }
+                }
+            } catch (error) {
+                console.error('컬럼 라벨 로드 실패:', error);
+                setColumns(DEFAULT_COLUMNS);
+            }
+        }
+        loadColumnLabels();
+    }, [shortId]);
 
     // ── Real-time listener ────────────────────────────────────────────────────
     useEffect(() => {
@@ -111,7 +142,7 @@ export default function SettlementPage() {
                 const memberDayData = dailyData[dateKey];
                 if (memberDayData && Object.values(memberDayData).some(v => v !== '')) {
                     const numMap: Record<string, number> = {};
-                    for (const col of COLUMNS) numMap[col.key] = parseInt(memberDayData[col.key] ?? '0') || 0;
+                    for (const col of columns) numMap[col.key] = parseInt(memberDayData[col.key] ?? '0') || 0;
                     if (!existingDailyData[dateKey]) existingDailyData[dateKey] = {};
                     existingDailyData[dateKey][memberName] = numMap;
                 } else {
@@ -123,11 +154,11 @@ export default function SettlementPage() {
             }
 
             // Calculate monthly total for this member
-            const myTotal: Record<string, number> = Object.fromEntries(COLUMNS.map(c => [c.key, 0]));
+            const myTotal: Record<string, number> = Object.fromEntries(columns.map(c => [c.key, 0]));
             for (const [, membersMap] of Object.entries(existingDailyData)) {
                 const mData = (membersMap as any)[memberName];
                 if (mData) {
-                    for (const col of COLUMNS) myTotal[col.key] += (mData[col.key] as number) || 0;
+                    for (const col of columns) myTotal[col.key] += (mData[col.key] as number) || 0;
                 }
             }
             existingMonthlyTotal[memberName] = myTotal;
@@ -204,7 +235,7 @@ export default function SettlementPage() {
                         <thead className="sticky top-0 z-10">
                             <tr className="bg-[#F0F4FF]">
                                 <th className="w-14 py-3 px-2 text-center text-xs font-bold text-gray-500 border-b border-gray-200">날짜</th>
-                                {COLUMNS.map(col => (
+                                {columns.map(col => (
                                     <th key={col.key} className="py-3 px-2 text-center text-xs font-bold text-[#42A5F5] border-b border-gray-200 min-w-[60px]">
                                         {col.label}
                                     </th>
@@ -230,7 +261,7 @@ export default function SettlementPage() {
                                             <div className={`text-[10px] ${dayColor} opacity-80`}>{WEEKDAY_NAMES[weekday]}</div>
                                         </td>
                                         {/* Data cells */}
-                                        {COLUMNS.map(col => {
+                                        {columns.map(col => {
                                             const value = dailyData[dateKey]?.[col.key] ?? '';
                                             return (
                                                 <td key={col.key} className="px-1.5 py-1.5 text-center min-w-[60px]">
@@ -261,7 +292,7 @@ export default function SettlementPage() {
                             {/* Totals row */}
                             <tr className="bg-[#F0F4FF] font-bold border-t-2 border-gray-300 sticky bottom-0">
                                 <td className="py-3 text-center text-xs font-bold text-[#42A5F5]">합계</td>
-                                {COLUMNS.map(col => {
+                                {columns.map(col => {
                                     const total = colTotal(col.key);
                                     return (
                                         <td key={col.key} className="py-3 text-center">
