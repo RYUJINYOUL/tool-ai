@@ -99,7 +99,8 @@ export default function ScheduleViewPage() {
             if (snap.empty) { setLoading(false); return; }
             const d = snap.docs[0];
             const data = d.data();
-            setDocId(d.id);
+            const fetchedId = d.id;
+            setDocId(fetchedId);
             setScheduleData({ name: data.name || '', company: data.company || '' });
             setMembers(data.members ?? []);
             setNotices(data.notices ?? []);
@@ -112,10 +113,20 @@ export default function ScheduleViewPage() {
             }
             setDayOffs(parsed);
 
+            // Access Control Check
+            const isCreator = firebaseUser && firebaseUser.uid === fetchedId;
+            const isAuthorized = sessionStorage.getItem(`schedule_auth_${shortId}`) === 'true';
+
+            if (!isCreator && !isAuthorized) {
+                console.log('Unauthorized access attempt. Redirecting to entrance.');
+                router.replace(`/schedule/entrance/${shortId}`);
+                return;
+            }
+
             setLoading(false);
         });
         return () => unsub();
-    }, [shortId]);
+    }, [shortId, firebaseUser, router]);
 
     // ── Firestore helpers ────────────────────────────────────────────────────────
     const saveField = async (field: string, value: unknown) => {
@@ -225,8 +236,9 @@ export default function ScheduleViewPage() {
 
     // ── Communication management ─────────────────────────────────────────────────
     const addComm = async () => {
-        if (!newComm.trim() || !user) return;
-        const comm: Communication = { author: user.username ?? user.email ?? '익명', content: newComm.trim(), date: new Date().toLocaleString('ko-KR') };
+        if (!newComm.trim()) return;
+        const author = user ? (user.username ?? user.email ?? '익명') : '익명';
+        const comm: Communication = { author, content: newComm.trim(), date: new Date().toLocaleString('ko-KR') };
         const updated = [...communications, comm];
         setCommunications(updated);
         await saveField('communications', updated);
@@ -523,23 +535,21 @@ export default function ScheduleViewPage() {
                                                     </div>
                                                 ))}
                                             </div>
-                                            {user && (
-                                                <div className="flex gap-2 pt-1 flex-shrink-0">
-                                                    <input
-                                                        type="text"
-                                                        value={newComm}
-                                                        onChange={e => setNewComm(e.target.value)}
-                                                        placeholder="메시지를 입력하세요"
-                                                        className="flex-1 input-field px-3 py-2.5 rounded-xl text-sm outline-none bg-white border shadow-sm focus:border-[#42A5F5]"
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                                                                addComm();
-                                                            }
-                                                        }}
-                                                    />
-                                                    <button onClick={addComm} className="px-4 py-2 bg-[#42A5F5] text-white rounded-xl text-sm font-bold">전송</button>
-                                                </div>
-                                            )}
+                                            <div className="flex gap-2 pt-1 flex-shrink-0">
+                                                <input
+                                                    type="text"
+                                                    value={newComm}
+                                                    onChange={e => setNewComm(e.target.value)}
+                                                    placeholder="메시지를 입력하세요"
+                                                    className="flex-1 input-field px-3 py-2.5 rounded-xl text-sm outline-none bg-white border shadow-sm focus:border-[#42A5F5]"
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                                                            addComm();
+                                                        }
+                                                    }}
+                                                />
+                                                <button onClick={addComm} className="px-4 py-2 bg-[#42A5F5] text-white rounded-xl text-sm font-bold">전송</button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -631,19 +641,17 @@ export default function ScheduleViewPage() {
                                                                 </div>
                                                             ))}
                                                         </div>
-                                                        {user && (
-                                                            <div className="flex gap-2 pt-2">
-                                                                <input
-                                                                    type="text"
-                                                                    value={newComm}
-                                                                    onChange={e => setNewComm(e.target.value)}
-                                                                    placeholder="메시지 입력"
-                                                                    className="flex-1 bg-gray-50 px-3 py-2 rounded-xl text-xs outline-none border border-gray-100 focus:border-blue-200"
-                                                                    onKeyDown={e => e.key === 'Enter' && addComm()}
-                                                                />
-                                                                <button onClick={addComm} className="px-3 py-1.5 bg-[#42A5F5] text-white rounded-lg text-xs font-bold">전송</button>
-                                                            </div>
-                                                        )}
+                                                        <div className="flex gap-2 pt-2">
+                                                            <input
+                                                                type="text"
+                                                                value={newComm}
+                                                                onChange={e => setNewComm(e.target.value)}
+                                                                placeholder="메시지 입력"
+                                                                className="flex-1 bg-gray-50 px-3 py-2 rounded-xl text-xs outline-none border border-gray-100 focus:border-blue-200"
+                                                                onKeyDown={e => e.key === 'Enter' && addComm()}
+                                                            />
+                                                            <button onClick={addComm} className="px-3 py-1.5 bg-[#42A5F5] text-white rounded-lg text-xs font-bold">전송</button>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>

@@ -34,9 +34,9 @@ export default function SettlementPage() {
     const searchParams = useSearchParams();
     const creatorUid = searchParams.get('uid') ?? '';
     const router = useRouter();
-    const { user } = useAuth();
+    const { firebaseUser, loading: authLoading } = useAuth();
 
-    const isAdmin = !!user && user.uid === creatorUid;
+    const isAdmin = !!firebaseUser && firebaseUser.uid === creatorUid;
 
     const now = new Date();
     const [focusedYear, setFocusedYear] = useState(now.getFullYear());
@@ -44,7 +44,7 @@ export default function SettlementPage() {
     const [dailyData, setDailyData] = useState<DailyData>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    
+
     // Dynamic column labels
     const [columns, setColumns] = useState(DEFAULT_COLUMNS);
 
@@ -59,7 +59,7 @@ export default function SettlementPage() {
                 const snap = await getDocs(q);
                 if (!snap.empty) {
                     const data = snap.docs[0].data();
-                    
+
                     // Load custom column labels if they exist
                     if (data.columnLabels) {
                         const customColumns = DEFAULT_COLUMNS.map(col => ({
@@ -70,6 +70,18 @@ export default function SettlementPage() {
                     } else {
                         setColumns(DEFAULT_COLUMNS);
                     }
+
+                    // Access Control Check
+                    const isCreator = firebaseUser && firebaseUser.uid === creatorUid;
+                    const isAuthorized = sessionStorage.getItem(`schedule_auth_${shortId}`) === 'true';
+
+                    if (!isCreator && !isAuthorized) {
+                        console.log('Unauthorized access attempt in member settlement. Redirecting to entrance.');
+                        router.replace(`/schedule/entrance/${shortId}`);
+                        return;
+                    }
+                } else {
+                    router.replace('/');
                 }
             } catch (error) {
                 console.error('컬럼 라벨 로드 실패:', error);
@@ -77,7 +89,7 @@ export default function SettlementPage() {
             }
         }
         loadColumnLabels();
-    }, [shortId]);
+    }, [shortId, firebaseUser, creatorUid, router]);
 
     // ── Real-time listener ────────────────────────────────────────────────────
     useEffect(() => {

@@ -52,12 +52,12 @@ export default function TeamSettlementPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [adminModal, setAdminModal] = useState<'settlement' | null>(null);
     const [settlementMsg, setSettlementMsg] = useState('');
-    
+
     // Dynamic column labels
     const [columns, setColumns] = useState(DEFAULT_COLUMNS);
     const [editingColumn, setEditingColumn] = useState<string | null>(null);
     const [tempLabel, setTempLabel] = useState('');
-    
+
     // Monthly view states
     const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
     const [focusedYear, setFocusedYear] = useState(new Date().getFullYear());
@@ -77,7 +77,7 @@ export default function TeamSettlementPage() {
             if (!snap.empty) {
                 const data = snap.docs[0].data();
                 setMembers(data.members || []);
-                
+
                 // Load custom column labels if they exist
                 if (data.columnLabels) {
                     const customColumns = DEFAULT_COLUMNS.map(col => ({
@@ -88,10 +88,23 @@ export default function TeamSettlementPage() {
                 } else {
                     setColumns(DEFAULT_COLUMNS);
                 }
+
+                // Access Control Check
+                const isCreator = firebaseUser && (firebaseUser.uid === (searchParams.get('uid') ?? ''));
+                const isAuthorized = sessionStorage.getItem(`schedule_auth_${shortId}`) === 'true';
+
+                if (!isCreator && !isAuthorized) {
+                    console.log('Unauthorized access attempt in settlement. Redirecting to entrance.');
+                    router.replace(`/schedule/entrance/${shortId}`);
+                    return;
+                }
+            } else {
+                // Schedule not found, also redirect
+                router.replace('/');
             }
         }
         loadSchedule();
-    }, [shortId]);
+    }, [shortId, firebaseUser, router, searchParams]);
 
     // ── Real-time listener for current month's performance ──────────────────────
     useEffect(() => {
@@ -128,19 +141,19 @@ export default function TeamSettlementPage() {
         setIsLoadingYearly(true);
         try {
             const yearlyData: YearlyData = {};
-            
+
             // Load data for all 12 months
             for (let month = 1; month <= 12; month++) {
                 const monthStr = String(month).padStart(2, '0');
                 const docId = `${shortId}_${year}-${monthStr}`;
-                
+
                 console.log(`문서 확인 중: ${docId}`);
                 const snap = await getDoc(doc(db, 'performance', docId));
                 if (snap.exists()) {
                     const data = snap.data();
                     const monthlyTotal = data.monthlyTotal || {};
                     console.log(`${docId} 데이터 발견:`, monthlyTotal);
-                    
+
                     // Store each member's monthly totals
                     Object.entries(monthlyTotal).forEach(([memberName, totals]: [string, any]) => {
                         if (!yearlyData[memberName]) {
@@ -152,7 +165,7 @@ export default function TeamSettlementPage() {
                     console.log(`${docId} 문서 없음`);
                 }
             }
-            
+
             console.log('최종 연간 데이터:', yearlyData);
             setYearlyData(yearlyData);
         } catch (error) {
@@ -188,7 +201,7 @@ export default function TeamSettlementPage() {
 
         try {
             // Update local state
-            const updatedColumns = columns.map(col => 
+            const updatedColumns = columns.map(col =>
                 col.key === columnKey ? { ...col, label: tempLabel.trim() } : col
             );
             setColumns(updatedColumns);
@@ -337,7 +350,7 @@ export default function TeamSettlementPage() {
                         columns.forEach(col => {
                             let value = 0;
                             let foundMethod = 'none';
-                            
+
                             // 1. 고정 키로 읽기 (del, err 등)
                             if (row[col.key]) {
                                 value = Number(row[col.key]) || 0;
@@ -371,7 +384,7 @@ export default function TeamSettlementPage() {
                                     foundMethod = 'pattern';
                                 }
                             }
-                            
+
                             console.log(`  컬럼 ${col.key}(${col.label}): ${value} (방식: ${foundMethod})`);
                             rowData[col.key] = value;
                         });
@@ -381,7 +394,7 @@ export default function TeamSettlementPage() {
                     });
 
                     console.log('월별 업데이트 데이터:', updatesByMonth);
-                    
+
                     if (Object.keys(updatesByMonth).length === 0) {
                         alert('가져올 데이터가 없거나 날짜 형식이 올바르지 않습니다.');
                         return;
@@ -420,12 +433,12 @@ export default function TeamSettlementPage() {
                         affectedMembers.forEach(m => {
                             if (!m) return;
                             const total: Record<string, number> = {};
-                            
+
                             // 동적 컬럼에 대해 합계 계산
                             columns.forEach(col => {
                                 total[col.key] = 0;
                             });
-                            
+
                             Object.entries(dailyD).forEach(([dKy, membersMap]: [string, any]) => {
                                 if (dKy.startsWith(ym) && membersMap[m]) {
                                     const md = membersMap[m];
@@ -487,7 +500,7 @@ export default function TeamSettlementPage() {
             // 엑셀 파일 생성
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet(sampleData);
-            
+
             // 컬럼 너비 설정
             const colWidths = [
                 { wch: 12 }, // 날짜
@@ -497,11 +510,11 @@ export default function TeamSettlementPage() {
             ws['!cols'] = colWidths;
 
             XLSX.utils.book_append_sheet(wb, ws, '정산 템플릿');
-            
+
             // 파일 다운로드
             const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([wbout], { type: 'application/octet-stream' });
-            
+
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -569,21 +582,19 @@ export default function TeamSettlementPage() {
                 <div className="flex items-center justify-center gap-2 mb-4">
                     <button
                         onClick={() => setViewMode('daily')}
-                        className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
-                            viewMode === 'daily' 
-                                ? 'bg-[#42A5F5] text-white shadow-md' 
+                        className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${viewMode === 'daily'
+                                ? 'bg-[#42A5F5] text-white shadow-md'
                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                            }`}
                     >
                         일별보기
                     </button>
                     <button
                         onClick={() => setViewMode('monthly')}
-                        className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
-                            viewMode === 'monthly' 
-                                ? 'bg-[#42A5F5] text-white shadow-md' 
+                        className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${viewMode === 'monthly'
+                                ? 'bg-[#42A5F5] text-white shadow-md'
                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                            }`}
                     >
                         월별보기
                     </button>
@@ -648,7 +659,7 @@ export default function TeamSettlementPage() {
                                     <th className="sticky left-0 z-20 bg-gray-50/50 py-4 px-3 text-left text-xs font-black text-gray-400 border-b border-gray-100 min-w-[100px]">
                                         팀원 이름
                                     </th>
-                                    {Array.from({length: 12}, (_, i) => (
+                                    {Array.from({ length: 12 }, (_, i) => (
                                         <th key={i} className="py-4 px-2 text-center text-xs font-black text-[#42A5F5] border-b border-gray-100 min-w-[80px]">
                                             {i + 1}월
                                         </th>
@@ -672,31 +683,31 @@ export default function TeamSettlementPage() {
                                     members.map((member, idx) => {
                                         const memberData = yearlyData[member.name] || {};
                                         let yearTotal = 0;
-                                        
+
                                         return (
                                             <tr key={idx} className="border-b border-gray-50 hover:bg-blue-50/20 transition-colors">
                                                 <td className="sticky left-0 z-10 bg-white py-3 px-3 border-r border-gray-100">
                                                     <div className="flex items-center gap-3">
-                                                        <div 
-                                                            className="w-3 h-3 rounded-full flex-shrink-0" 
+                                                        <div
+                                                            className="w-3 h-3 rounded-full flex-shrink-0"
                                                             style={{ backgroundColor: member.color || '#42A5F5' }}
                                                         ></div>
                                                         <span className="font-bold text-gray-700 text-sm truncate">{member.name}</span>
                                                     </div>
                                                 </td>
-                                                {Array.from({length: 12}, (_, monthIndex) => {
+                                                {Array.from({ length: 12 }, (_, monthIndex) => {
                                                     const monthStr = String(monthIndex + 1).padStart(2, '0');
                                                     const monthData = memberData[monthStr] || {};
-                                                    const monthTotal = columns.reduce((sum, col) => 
+                                                    const monthTotal = columns.reduce((sum, col) =>
                                                         sum + (Number(monthData[col.key]) || 0), 0
                                                     );
                                                     yearTotal += monthTotal;
-                                                    
+
                                                     return (
                                                         <td key={monthIndex} className="px-2 py-3 text-center">
                                                             <div className={`h-9 flex items-center justify-center rounded-lg text-sm font-medium border
-                                                                ${monthTotal > 0 
-                                                                    ? 'bg-blue-50 border-blue-100 text-gray-800' 
+                                                                ${monthTotal > 0
+                                                                    ? 'bg-blue-50 border-blue-100 text-gray-800'
                                                                     : 'bg-gray-50 border-gray-100 text-gray-300'
                                                                 }`}>
                                                                 {monthTotal > 0 ? monthTotal : '-'}
@@ -706,8 +717,8 @@ export default function TeamSettlementPage() {
                                                 })}
                                                 <td className="px-2 py-3 text-center">
                                                     <div className={`h-9 flex items-center justify-center rounded-lg text-sm font-bold border-2
-                                                        ${yearTotal > 0 
-                                                            ? 'bg-red-50 border-red-200 text-red-700' 
+                                                        ${yearTotal > 0
+                                                            ? 'bg-red-50 border-red-200 text-red-700'
                                                             : 'bg-gray-50 border-gray-200 text-gray-300'
                                                         }`}>
                                                         {yearTotal > 0 ? yearTotal : '-'}
@@ -887,10 +898,10 @@ export default function TeamSettlementPage() {
                 <p className="text-[11px] text-blue-600 font-bold leading-relaxed text-center">
                     {viewMode === 'daily' ? (
                         <>💡 상단 날짜를 이동하며 팀 전체의 배송/반품 성과를 한눈에 입력할 수 있습니다.<br />
-                        입력 완료 후 우측 상단 '저장하기' 버튼을 꼭 눌러주세요.</>
+                            입력 완료 후 우측 상단 '저장하기' 버튼을 꼭 눌러주세요.</>
                     ) : (
                         <>📊 연간 월별 합계를 한눈에 확인할 수 있습니다.<br />
-                        각 월의 데이터는 일별보기에서 입력하실 수 있습니다.</>
+                            각 월의 데이터는 일별보기에서 입력하실 수 있습니다.</>
                     )}
                 </p>
             </div>
@@ -917,13 +928,13 @@ export default function TeamSettlementPage() {
                                     <p>2. "엑셀 업로드"로 파일 업로드</p>
                                 </div>
                             </div>
-                            
+
                             <button onClick={handleDownloadFormat}
                                 className="w-full flex items-center justify-center gap-3 py-4 border-2 border-green-500 text-green-600 rounded-2xl font-bold hover:bg-green-50 transition-all active:scale-95">
                                 <span className="text-lg">📥</span>
                                 엑셀 양식 다운로드
                             </button>
-                            
+
                             <button onClick={handleExcelUpload}
                                 className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95">
                                 <span className="text-lg">📤</span>

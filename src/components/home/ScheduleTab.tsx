@@ -109,7 +109,7 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-3">
                     <button
                         onClick={() => userSchedule ? router.push(`/schedule/view/${userSchedule.shortId}`) : router.push('/schedule/create')}
-                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-400 to-blue-400 text-white w-full md:w-auto px-6 md:px-8 py-3 md:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
+                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-400 to-blue-400 text-white w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         {userSchedule ? (
                             <>
@@ -135,7 +135,7 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                             }
                         }}
 
-                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-pink-300 to-pink-300 text-white w-full md:w-auto px-6 md:px-8 py-3 md:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
+                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-pink-300 to-pink-300 text-white w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         {userSchedule ? (
                             <>
@@ -161,12 +161,12 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                                 router.push('/schedule/create');
                             }
                         }}
-                        className="hidden sm:flex items-center justify-center gap-2 bg-gradient-to-r from-green-400 to-emerald-400 text-white w-full md:w-auto px-6 md:px-8 py-3 md:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
+                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-400 to-emerald-400 text-white w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
-                        {userSchedule ? '팀원 정산 내역' : '정산 기능 사용하기'}
+                        {userSchedule ? '팀원 정산 내역' : '정산 AI 자동 입력'}
                     </button>
                 </div>
             </div>
@@ -314,173 +314,179 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
             </div>
 
             {/* Full Calendar Mode - Team Members at Bottom */}
-            {isFullCalendar && (
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="p-6 border-b border-gray-100">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-bold flex items-center gap-2">
-                                <Users className="w-5 h-5 text-green-600" />
-                                팀원 목록
-                                <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-                                    {members.length}명
-                                </span>
-                            </h3>
-                            <button
-                                onClick={() => setAddMemberModal(true)}
-                                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                                title="팀원 추가"
-                            >
-                                <Plus className="w-4 h-4 text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="p-4">
-                        {members.length === 0 ? (
-                            <div className="text-center py-8">
-                                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                <p className="text-gray-500 text-sm font-medium mb-3">등록된 팀원이 없습니다</p>
+            {
+                isFullCalendar && (
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="p-6 border-b border-gray-100">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-green-600" />
+                                    팀원 목록
+                                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+                                        {members.length}명
+                                    </span>
+                                </h3>
                                 <button
                                     onClick={() => setAddMemberModal(true)}
-                                    className="text-blue-600 text-sm font-bold hover:underline"
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                    title="팀원 추가"
                                 >
-                                    + 팀원 추가하기
+                                    <Plus className="w-4 h-4 text-gray-600" />
                                 </button>
                             </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-                                {members.map((member, index) => {
-                                    const isSelected = selectedMember === member.name;
-                                    return (
-                                        <div
-                                            key={member.name}
-                                            onClick={() => setSelectedMember(isSelected ? null : member.name)}
-                                            className={`p-4 rounded-2xl border cursor-pointer transition-all ${isSelected
-                                                ? 'bg-blue-50 border-blue-200 shadow-sm'
-                                                : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
-                                                }`}
-                                        >
-                                            <div className="flex flex-col items-center text-center">
-                                                <div
-                                                    className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mb-2"
-                                                    style={{
-                                                        backgroundColor: member.color || `hsl(${index * 137.5 % 360}, 70%, 50%)`
-                                                    }}
-                                                >
-                                                    {member.name.charAt(0)}
-                                                </div>
-                                                <p className="font-bold text-sm mb-1">{member.name}</p>
-                                                {member.phone && (
-                                                    <p className="text-xs text-gray-500 mb-2">{member.phone}</p>
-                                                )}
-                                                <div className="flex items-center gap-2">
-                                                    <a
-                                                        href={`/schedule/view/${userSchedule?.shortId}/settlement/${encodeURIComponent(member.name)}?uid=${user?.uid || ''}`}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="p-1.5 hover:bg-blue-100 rounded-full transition-colors"
-                                                        title="정산 입력"
+                        </div>
+
+                        <div className="p-4">
+                            {members.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500 text-sm font-medium mb-3">등록된 팀원이 없습니다</p>
+                                    <button
+                                        onClick={() => setAddMemberModal(true)}
+                                        className="text-blue-600 text-sm font-bold hover:underline"
+                                    >
+                                        + 팀원 추가하기
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                                    {members.map((member, index) => {
+                                        const isSelected = selectedMember === member.name;
+                                        return (
+                                            <div
+                                                key={member.name}
+                                                onClick={() => setSelectedMember(isSelected ? null : member.name)}
+                                                className={`p-4 rounded-2xl border cursor-pointer transition-all ${isSelected
+                                                    ? 'bg-blue-50 border-blue-200 shadow-sm'
+                                                    : 'bg-gray-50 border-gray-100 hover:bg-gray-100'
+                                                    }`}
+                                            >
+                                                <div className="flex flex-col items-center text-center">
+                                                    <div
+                                                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mb-2"
+                                                        style={{
+                                                            backgroundColor: member.color || `hsl(${index * 137.5 % 360}, 70%, 50%)`
+                                                        }}
                                                     >
-                                                        <ClipboardList className="w-3.5 h-3.5 text-blue-600" />
-                                                    </a>
-                                                    {isSelected && (
-                                                        <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                                            선택됨
-                                                        </div>
+                                                        {member.name.charAt(0)}
+                                                    </div>
+                                                    <p className="font-bold text-sm mb-1">{member.name}</p>
+                                                    {member.phone && (
+                                                        <p className="text-xs text-gray-500 mb-2">{member.phone}</p>
                                                     )}
+                                                    <div className="flex items-center gap-2">
+                                                        <a
+                                                            href={`/schedule/view/${userSchedule?.shortId}/settlement/${encodeURIComponent(member.name)}?uid=${user?.uid || ''}`}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="p-1.5 hover:bg-blue-100 rounded-full transition-colors"
+                                                            title="정산 입력"
+                                                        >
+                                                            <ClipboardList className="w-3.5 h-3.5 text-blue-600" />
+                                                        </a>
+                                                        {isSelected && (
+                                                            <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                                                선택됨
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Day Off Dialog */}
-            {dayOffDialog && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setDayOffDialog(null)}>
-                    <div className="bg-white rounded-3xl w-full max-w-sm p-8 flex flex-col shadow-2xl animate-scale-in" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 bg-blue-100 rounded-2xl flex items-center justify-center">
-                                <Users className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <h3 className="font-bold text-xl">휴무 관리</h3>
-                        </div>
-                        <p className="text-blue-600 font-bold mb-4">{dayOffDialog.split('-')[1]}월 {dayOffDialog.split('-')[2]}일</p>
-                        <p className="text-xs text-gray-400 mb-6 font-medium">직원을 클릭하면 휴무로 자동 표시됩니다.</p>
-
-                        <div className="space-y-2 max-h-64 overflow-y-auto px-1 custom-scrollbar">
-                            {members.length === 0 ? (
-                                <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                    <p className="text-sm text-gray-400 font-bold">등록된 팀원이 없습니다.</p>
-                                    <button onClick={() => { setDayOffDialog(null); setAddMemberModal(true); }} className="mt-2 text-blue-500 text-xs font-bold hover:underline">+ 팀원 추가하기</button>
+            {
+                dayOffDialog && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setDayOffDialog(null)}>
+                        <div className="bg-white rounded-3xl w-full max-w-sm p-8 flex flex-col shadow-2xl animate-scale-in" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 bg-blue-100 rounded-2xl flex items-center justify-center">
+                                    <Users className="w-5 h-5 text-blue-600" />
                                 </div>
-                            ) : (
-                                members.map((member) => {
-                                    const isOff = dayOffs[dayOffDialog]?.has(member.name);
-                                    return (
-                                        <button
-                                            key={member.name}
-                                            onClick={() => toggleDayOff(dayOffDialog, member.name)}
-                                            className={`w-full p-4 rounded-2xl flex items-center justify-between transition-all border ${isOff ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-gray-50 border-gray-100 text-gray-700 hover:border-blue-200'}`}
-                                        >
-                                            <span className="font-bold">{member.name}</span>
-                                            {isOff && <div className="bg-white/20 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter">OFF</div>}
-                                        </button>
-                                    );
-                                })
-                            )}
+                                <h3 className="font-bold text-xl">휴무 관리</h3>
+                            </div>
+                            <p className="text-blue-600 font-bold mb-4">{dayOffDialog.split('-')[1]}월 {dayOffDialog.split('-')[2]}일</p>
+                            <p className="text-xs text-gray-400 mb-6 font-medium">직원을 클릭하면 휴무로 자동 표시됩니다.</p>
+
+                            <div className="space-y-2 max-h-64 overflow-y-auto px-1 custom-scrollbar">
+                                {members.length === 0 ? (
+                                    <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                        <p className="text-sm text-gray-400 font-bold">등록된 팀원이 없습니다.</p>
+                                        <button onClick={() => { setDayOffDialog(null); setAddMemberModal(true); }} className="mt-2 text-blue-500 text-xs font-bold hover:underline">+ 팀원 추가하기</button>
+                                    </div>
+                                ) : (
+                                    members.map((member) => {
+                                        const isOff = dayOffs[dayOffDialog]?.has(member.name);
+                                        return (
+                                            <button
+                                                key={member.name}
+                                                onClick={() => toggleDayOff(dayOffDialog, member.name)}
+                                                className={`w-full p-4 rounded-2xl flex items-center justify-between transition-all border ${isOff ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-gray-50 border-gray-100 text-gray-700 hover:border-blue-200'}`}
+                                            >
+                                                <span className="font-bold">{member.name}</span>
+                                                {isOff && <div className="bg-white/20 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter">OFF</div>}
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+                            <button onClick={() => setDayOffDialog(null)} className="mt-8 w-full py-4 rounded-2xl bg-gray-900 text-white font-bold hover:bg-black transition-all shadow-xl active:scale-95">확인</button>
                         </div>
-                        <button onClick={() => setDayOffDialog(null)} className="mt-8 w-full py-4 rounded-2xl bg-gray-900 text-white font-bold hover:bg-black transition-all shadow-xl active:scale-95">확인</button>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Add Member Modal */}
-            {addMemberModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setAddMemberModal(false)}>
-                    <div className="bg-white rounded-3xl w-full max-w-sm p-8 flex flex-col shadow-2xl animate-scale-in" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 bg-green-100 rounded-2xl flex items-center justify-center">
-                                <Plus className="w-5 h-5 text-green-600" />
-                            </div>
-                            <h3 className="font-bold text-xl">빠른 팀원 추가</h3>
-                        </div>
-
-                        <div className="space-y-4 mb-8">
-                            {!userSchedule ? (
-                                <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                                    <p className="text-sm text-black font-bold text-center leading-relaxed">일정표를 먼저 만들고<br />팀원을 추가하세요.</p>
+            {
+                addMemberModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={() => setAddMemberModal(false)}>
+                        <div className="bg-white rounded-3xl w-full max-w-sm p-8 flex flex-col shadow-2xl animate-scale-in" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-10 h-10 bg-green-100 rounded-2xl flex items-center justify-center">
+                                    <Plus className="w-5 h-5 text-green-600" />
                                 </div>
-                            ) : (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">팀원 이름</label>
-                                        <input type="text" value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="실명을 입력하세요" className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-700 font-bold" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">전화번호 (선택)</label>
-                                        <input type="text" value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="010-0000-0000" className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-700 font-bold" />
-                                    </div>
-                                </>
-                            )}
-                        </div>
+                                <h3 className="font-bold text-xl">빠른 팀원 추가</h3>
+                            </div>
 
-                        <div className="flex gap-3">
-                            {!userSchedule ? (
-                                <button onClick={() => router.push('/schedule/create')} className="w-full py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95">일정표 만들기</button>
-                            ) : (
-                                <>
-                                    <button onClick={() => setAddMemberModal(false)} className="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-500 font-bold hover:bg-gray-200 transition-all active:scale-95">취소</button>
-                                    <button onClick={handleAddMember} className="flex-1 py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95">저장</button>
-                                </>
-                            )}
+                            <div className="space-y-4 mb-8">
+                                {!userSchedule ? (
+                                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                                        <p className="text-sm text-black font-bold text-center leading-relaxed">일정표를 먼저 만들고<br />팀원을 추가하세요.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">팀원 이름</label>
+                                            <input type="text" value={newMemberName} onChange={(e) => setNewMemberName(e.target.value)} placeholder="실명을 입력하세요" className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-700 font-bold" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">전화번호 (선택)</label>
+                                            <input type="text" value={newMemberPhone} onChange={(e) => setNewMemberPhone(e.target.value)} placeholder="010-0000-0000" className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-700 font-bold" />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3">
+                                {!userSchedule ? (
+                                    <button onClick={() => router.push('/schedule/create')} className="w-full py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95">일정표 만들기</button>
+                                ) : (
+                                    <>
+                                        <button onClick={() => setAddMemberModal(false)} className="flex-1 py-4 rounded-2xl bg-gray-100 text-gray-500 font-bold hover:bg-gray-200 transition-all active:scale-95">취소</button>
+                                        <button onClick={handleAddMember} className="flex-1 py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95">저장</button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
