@@ -46,10 +46,29 @@ export default function NoticeBoard() {
     const noticeScrollRef = useRef<HTMLDivElement | null>(null);
 
     const NOTICE_SCROLL_KEY = 'noticeBoardScrollTop';
+    const NOTICE_STATE_KEY = 'noticeBoardRestoreState';
 
-    /** 뒤로 가기 시 공지 패널 다시 열고 스크롤 복원 */
+    /** 뒤로 가기 시 검색/필터 상태 복원 후 공지 패널 열고 스크롤 복원 */
     useEffect(() => {
         if (typeof window === 'undefined') return;
+        const stateJson = sessionStorage.getItem(NOTICE_STATE_KEY);
+        if (stateJson) {
+            try {
+                const s = JSON.parse(stateJson) as {
+                    regionSearch?: string;
+                    isFilterActive?: boolean;
+                    filteredIds?: string[] | null;
+                    searchQuery?: string;
+                    activeTab?: string;
+                };
+                if (s.regionSearch != null) setRegionSearch(s.regionSearch);
+                if (s.isFilterActive != null) setIsFilterActive(s.isFilterActive);
+                if (s.filteredIds != null) setFilteredIds(s.filteredIds);
+                if (s.searchQuery != null) setSearchQuery(s.searchQuery);
+                if (s.activeTab != null) setActiveTab(s.activeTab);
+            } catch (_) {}
+            sessionStorage.removeItem(NOTICE_STATE_KEY);
+        }
         const saved = sessionStorage.getItem(NOTICE_SCROLL_KEY);
         if (saved !== null) setIsNoticeOpen(true);
     }, []);
@@ -398,6 +417,13 @@ export default function NoticeBoard() {
                                         if (noticeScrollRef.current != null) {
                                             sessionStorage.setItem(NOTICE_SCROLL_KEY, String(noticeScrollRef.current.scrollTop));
                                         }
+                                        sessionStorage.setItem(NOTICE_STATE_KEY, JSON.stringify({
+                                            regionSearch,
+                                            isFilterActive,
+                                            filteredIds,
+                                            searchQuery,
+                                            activeTab,
+                                        }));
                                         router.push(`/pro-apply/${notice.id}`);
                                     }}
                                     >
