@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { CircleChevronUp, StickyNote, ChevronDown, Link as LinkIcon, X, ZoomIn, Search, Sparkles, Loader2, Phone, Briefcase, UserSearch, MapPin, CreditCard, Box, Award, PieChart, Plus, Smartphone, Play, Apple, Globe, ExternalLink, Camera } from 'lucide-react';
 import { useNotices } from '@/hooks/useNotices';
@@ -43,6 +43,33 @@ export default function NoticeBoard() {
     const [filteredIds, setFilteredIds] = useState<string[] | null>(null);
     const [isFilterActive, setIsFilterActive] = useState(false);
     const [regionSearch, setRegionSearch] = useState('');
+    const noticeScrollRef = useRef<HTMLDivElement | null>(null);
+
+    const NOTICE_SCROLL_KEY = 'noticeBoardScrollTop';
+
+    /** 뒤로 가기 시 공지 패널 다시 열고 스크롤 복원 */
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const saved = sessionStorage.getItem(NOTICE_SCROLL_KEY);
+        if (saved !== null) setIsNoticeOpen(true);
+    }, []);
+
+    /** 패널 열림 시 저장된 스크롤 위치 복원 */
+    useEffect(() => {
+        if (!isNoticeOpen) return;
+        const saved = sessionStorage.getItem(NOTICE_SCROLL_KEY);
+        if (saved === null) return;
+        const top = parseInt(saved, 10);
+        if (Number.isNaN(top)) {
+            sessionStorage.removeItem(NOTICE_SCROLL_KEY);
+            return;
+        }
+        const t = setTimeout(() => {
+            if (noticeScrollRef.current) noticeScrollRef.current.scrollTop = top;
+            sessionStorage.removeItem(NOTICE_SCROLL_KEY);
+        }, 150);
+        return () => clearTimeout(t);
+    }, [isNoticeOpen]);
 
     /** 지역 + SubCategories 검색. 공백/쉼표로 여러 키워드 가능(AND). cj ↔ 씨제이 통합 매칭 */
     const matchesRegionAndCategorySearch = (item: any, searchInput: string): boolean => {
@@ -193,6 +220,7 @@ export default function NoticeBoard() {
             {/* Notice Full Screen Overlay */}
             {isNoticeOpen && (
                 <div
+                    ref={noticeScrollRef}
                     className="fixed inset-0 z-[110] bg-white animate-fade-in overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
@@ -350,12 +378,28 @@ export default function NoticeBoard() {
                             return displayData.map((notice) => {
                                 const isExpanded = expandedNoticeIds.has(notice.id);
                                 const isHiring = activeTab === '택배구인';
+                                const selectedJobNamesText = Array.isArray((notice as any).selectedJobNames)
+                                    ? ((notice as any).selectedJobNames as any[])
+                                        .map((v) => (v ?? '').toString().trim())
+                                        .filter(Boolean)
+                                        .join(', ')
+                                    : ((notice as any).selectedJobNames ?? '').toString().trim();
+                                const addressText = ((notice as any).deliverAddress ?? (notice as any).address ?? '')
+                                    .toString()
+                                    .trim();
+                                const fallbackTitle = [selectedJobNamesText, addressText].filter(Boolean).join(' · ');
 
                                 return (
                                     <div
                                         key={notice.id}
                                         className={`p-5 rounded-2xl bg-white border border-gray-100 shadow-sm transition-all overflow-hidden ${isHiring ? 'cursor-pointer hover:border-blue-200' : 'cursor-default border-gray-100 hover:border-gray-100'}`}
-                                        onClick={() => isHiring && router.push(`/pro-apply/${notice.id}`)}
+                                        onClick={() => {
+                                        if (!isHiring) return;
+                                        if (noticeScrollRef.current != null) {
+                                            sessionStorage.setItem(NOTICE_SCROLL_KEY, String(noticeScrollRef.current.scrollTop));
+                                        }
+                                        router.push(`/pro-apply/${notice.id}`);
+                                    }}
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex-1 mr-3">
@@ -377,7 +421,12 @@ export default function NoticeBoard() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <h4 className="font-black text-gray-900 text-lg leading-tight tracking-tight">{notice.title || notice.username}</h4>
+                                                <h4 className="font-black text-gray-900 text-lg leading-tight tracking-tight">
+                                                    {(() => {
+                                                        const full = notice.title || fallbackTitle;
+                                                        return full.length > 35 ? `${full.slice(0, 35)}…` : full;
+                                                    })()}
+                                                </h4>
                                             </div>
                                             <span className="text-[10px] text-gray-400 font-bold whitespace-nowrap bg-gray-50 px-2 py-1 rounded-lg">
                                                 {notice.createdAt instanceof Date
