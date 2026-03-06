@@ -2,41 +2,50 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Notice } from '@/types/home';
 
 export function useNotices() {
     const [notices, setNotices] = useState<Notice[]>([]);
-    const [isNoticesLoading, setIsNoticesLoading] = useState(false);
+    const [isNoticesLoading, setIsNoticesLoading] = useState(true);
 
     useEffect(() => {
-        const fetchNotices = async () => {
-            setIsNoticesLoading(true);
-            try {
-                const q = collection(db, 'community');
-                const querySnapshot = await getDocs(q);
-                const fetchedNotices: Notice[] = [];
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if (data.categoryName === '공지사항') {
-                        fetchedNotices.push({ id: doc.id, ...data } as Notice);
-                    }
-                });
+        setIsNoticesLoading(true);
+        const q = collection(db, 'community');
 
-                fetchedNotices.sort((a, b) => {
-                    const dateA = a.createdAt?.seconds || 0;
-                    const dateB = b.createdAt?.seconds || 0;
-                    return dateB - dateA;
-                });
-                setNotices(fetchedNotices);
-            } catch (err) {
-                console.error('Error fetching notices:', err);
-            } finally {
-                setIsNoticesLoading(false);
-            }
-        };
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedNotices: Notice[] = [];
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const categories = ['구인구직', '택배부업', '용차출동', '공지사항'];
+                if (categories.includes(data.categoryName)) {
+                    // Convert Timestamp to Date if it exists
+                    const createdAt = data.createdAt instanceof Timestamp
+                        ? data.createdAt.toDate()
+                        : (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : new Date());
 
-        fetchNotices();
+                    fetchedNotices.push({
+                        ...data,
+                        id: doc.id,
+                        createdAt: createdAt
+                    } as any);
+                }
+            });
+
+            fetchedNotices.sort((a, b) => {
+                const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+                const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+                return dateB - dateA;
+            });
+
+            setNotices(fetchedNotices);
+            setIsNoticesLoading(false);
+        }, (err) => {
+            console.error('Error fetching notices:', err);
+            setIsNoticesLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
     return { notices, isNoticesLoading };

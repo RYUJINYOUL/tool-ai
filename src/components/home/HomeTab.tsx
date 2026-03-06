@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Search, Sparkles, Plus, Image as ImageIcon, FileText, ChevronRight, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useHomeData } from '@/hooks/useHomeData';
 import { useUserStorage } from '@/hooks/useUserStorage';
 import { useAuth } from '@/context/auth-context';
@@ -11,6 +12,7 @@ interface HomeTabProps {
 }
 
 export default function HomeTab({ setActiveTab }: HomeTabProps) {
+    const router = useRouter();
     const {
         favorites,
         isSearchFocused,
@@ -39,7 +41,7 @@ export default function HomeTab({ setActiveTab }: HomeTabProps) {
                         </div>
                         <input
                             type="text"
-                            placeholder="주요 업무를 선택 또는 입력 하세요"
+                            placeholder="주요 업무를 선택 하세요"
                             className="w-full px-5 py-3 text-base outline-none text-gray-700 placeholder-gray-400 font-medium"
                             onFocus={() => setIsSearchFocused(true)}
                             onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
@@ -57,11 +59,19 @@ export default function HomeTab({ setActiveTab }: HomeTabProps) {
                                     { text: "구인 공고를 더 쉽게 올려 보시겠어요", tab: 'ai' },
                                     { text: "팀원 근무일을 좀 더 편하게 관리하세요", tab: 'schedule' },
                                     { text: "팀원들과 정산은 아주 가볍게 매일매일", tab: 'schedule' },
-                                    { text: "혹시 자동화 툴이 필요 하신가요?", tab: 'ai' }
+                                    { text: "혹시 자동화 툴이 필요 하신가요?", tab: 'ai' },
+                                    { text: "택배 일자리 AI검색 필요하신가요?", tab: null }
                                 ].map((item, i) => (
                                     <div
                                         key={i}
-                                        onClick={() => setActiveTab(item.tab)}
+                                        onClick={() => {
+                                            if (item.tab === null) {
+                                                // NoticeBoard: home 탭 유지하면서 NoticeBoard 오버레이 오픈
+                                                router.push('/?tab=NoticeBoard&noticeTab=택배구인', { scroll: false });
+                                            } else {
+                                                setActiveTab(item.tab);
+                                            }
+                                        }}
                                         className="px-6 py-4 text-left text-sm font-semibold text-gray-600 hover:bg-blue-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0 flex items-center gap-3"
                                     >
                                         <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>

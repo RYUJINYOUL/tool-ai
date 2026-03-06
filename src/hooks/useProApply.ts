@@ -1,0 +1,68 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
+
+export interface ProApplyPost {
+    id: string;
+    title: string;
+    content: string;
+    author: string;
+    authorId: string;
+    createdAt: Date;
+    images?: string[];
+    link?: string;
+    category?: string;
+    company?: string;
+    deliverAddress?: string;
+    address?: string;
+    monthlyIncome?: string;
+    workTime?: string;
+    totalVolume?: string;
+    holiday?: string;
+    license?: string;
+    ratio?: string;
+    dropOff?: string;
+    terminalAddress?: string;
+    phoneNumber?: string;
+}
+
+export function useProApply() {
+    const [posts, setPosts] = useState<ProApplyPost[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        setLoading(true);
+        const q = collection(db, 'proApply');
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedPosts = snapshot.docs.map(doc => {
+                const data = doc.data();
+                // Normalize date to standard JS Date
+                const createdAt = data.createdAt instanceof Timestamp
+                    ? data.createdAt.toDate()
+                    : (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : new Date());
+
+                return {
+                    id: doc.id,
+                    ...data,
+                    createdAt: createdAt
+                } as ProApplyPost;
+            });
+
+            // Client-side sorting to avoid Firestore Index requirements
+            fetchedPosts.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+
+            setPosts(fetchedPosts);
+            setLoading(false);
+        }, (err) => {
+            console.error('Error fetching proApply posts:', err);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    return { posts, loading };
+}
