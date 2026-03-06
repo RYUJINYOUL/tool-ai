@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { CircleChevronUp, StickyNote, ChevronDown, Link as LinkIcon, X, ZoomIn, Search, Sparkles, Loader2, Phone, Briefcase, UserSearch, MapPin, CreditCard, Box, Award, PieChart, Plus, Smartphone, Play, Apple, Globe, ExternalLink, Camera } from 'lucide-react';
+import { CircleChevronUp, StickyNote, ChevronDown, Link as LinkIcon, X, ZoomIn, Search, Sparkles, Loader2, Phone, Briefcase, UserSearch, MapPin, CreditCard, Box, Award, PieChart, Plus, Smartphone, Play, Apple, Globe, ExternalLink, Camera, MessageSquare } from 'lucide-react';
 import { useNotices } from '@/hooks/useNotices';
 import { useProApply } from '@/hooks/useProApply';
 import { useProfessionals } from '@/hooks/useProfessionals';
@@ -66,7 +66,7 @@ export default function NoticeBoard() {
                 if (s.filteredIds != null) setFilteredIds(s.filteredIds);
                 if (s.searchQuery != null) setSearchQuery(s.searchQuery);
                 if (s.activeTab != null) setActiveTab(s.activeTab);
-            } catch (_) {}
+            } catch (_) { }
             sessionStorage.removeItem(NOTICE_STATE_KEY);
         }
         const saved = sessionStorage.getItem(NOTICE_SCROLL_KEY);
@@ -413,19 +413,19 @@ export default function NoticeBoard() {
                                         key={notice.id}
                                         className={`p-5 rounded-2xl bg-white border border-gray-100 shadow-sm transition-all overflow-hidden ${isHiring ? 'cursor-pointer hover:border-blue-200' : 'cursor-default border-gray-100 hover:border-gray-100'}`}
                                         onClick={() => {
-                                        if (!isHiring) return;
-                                        if (noticeScrollRef.current != null) {
-                                            sessionStorage.setItem(NOTICE_SCROLL_KEY, String(noticeScrollRef.current.scrollTop));
-                                        }
-                                        sessionStorage.setItem(NOTICE_STATE_KEY, JSON.stringify({
-                                            regionSearch,
-                                            isFilterActive,
-                                            filteredIds,
-                                            searchQuery,
-                                            activeTab,
-                                        }));
-                                        router.push(`/pro-apply/${notice.id}`);
-                                    }}
+                                            if (!isHiring) return;
+                                            if (noticeScrollRef.current != null) {
+                                                sessionStorage.setItem(NOTICE_SCROLL_KEY, String(noticeScrollRef.current.scrollTop));
+                                            }
+                                            sessionStorage.setItem(NOTICE_STATE_KEY, JSON.stringify({
+                                                regionSearch,
+                                                isFilterActive,
+                                                filteredIds,
+                                                searchQuery,
+                                                activeTab,
+                                            }));
+                                            router.push(`/pro-apply/${notice.id}`);
+                                        }}
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex-1 mr-3">
@@ -581,6 +581,21 @@ export default function NoticeBoard() {
             )}
 
             {/* 용카앱 설치 버튼: body에 포털로 렌더링해 스크롤과 무관하게 화면 하단 고정 */}
+            {typeof document !== 'undefined' && isNoticeOpen && activeTab === '공지사항' && ReactDOM.createPortal(
+                <div className="fixed bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
+                    <a
+                        href="http://pf.kakao.com/_XxixizX"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-8 py-4 bg-[#FEE500] text-[#3C1E1E] rounded-full font-black text-[15px] shadow-2xl hover:bg-[#F5DC00] transition-all transform hover:scale-105 active:scale-95 pointer-events-auto"
+                    >
+                        <MessageSquare className="w-5 h-5" />
+                        용카채팅문의
+                    </a>
+                </div>,
+                document.body
+            )}
+
             {typeof document !== 'undefined' && isNoticeOpen && activeTab === '택배구인' && ReactDOM.createPortal(
                 <div className="fixed bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
                     <button

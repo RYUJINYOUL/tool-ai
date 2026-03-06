@@ -34,7 +34,9 @@ export default function ProApplyDetailPage() {
     const [item, setItem] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
-    const [selectedZoomImage, setSelectedZoomImage] = useState<string | null>(null);
+    const [zoomIndex, setZoomIndex] = useState<number | null>(null);
+    const [touchStartX, setTouchStartX] = useState<number | null>(null);
+    const [zoomTouchStartX, setZoomTouchStartX] = useState<number | null>(null);
 
     // Navigation helper to return to Job Search tab
     const handleBack = () => {
@@ -127,7 +129,20 @@ export default function ProApplyDetailPage() {
             {hasImages && (
                 <div className="w-full bg-gray-50 border-b border-gray-100 overflow-hidden">
                     {/* Mobile Slider: show 1 image with dots */}
-                    <div className="md:hidden relative aspect-square w-full bg-gray-100 overflow-hidden">
+                    <div
+                        className="md:hidden relative aspect-square w-full bg-gray-100 overflow-hidden"
+                        onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+                        onTouchEnd={(e) => {
+                            if (touchStartX === null) return;
+                            const diff = touchStartX - e.changedTouches[0].clientX;
+                            if (diff > 50 && currentImageIndex < images.length - 1) {
+                                setCurrentImageIndex(currentImageIndex + 1);
+                            } else if (diff < -50 && currentImageIndex > 0) {
+                                setCurrentImageIndex(currentImageIndex - 1);
+                            }
+                            setTouchStartX(null);
+                        }}
+                    >
                         <div
                             className="flex transition-transform duration-300 ease-out h-full"
                             style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
@@ -138,7 +153,7 @@ export default function ProApplyDetailPage() {
                                     src={url}
                                     alt={`공고 이미지 ${idx + 1}`}
                                     className="w-full h-full object-cover flex-shrink-0 cursor-zoom-in"
-                                    onClick={() => setSelectedZoomImage(url)}
+                                    onClick={() => setZoomIndex(idx)}
                                 />
                             ))}
                         </div>
@@ -159,7 +174,7 @@ export default function ProApplyDetailPage() {
                     <div className="hidden md:block max-w-[1200px] mx-auto p-8">
                         <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide px-4 -mx-4">
                             {images.map((url: string, idx: number) => (
-                                <div key={idx} className="flex-shrink-0 w-[400px] aspect-[4/3] rounded-3xl overflow-hidden shadow-xl border border-gray-200 cursor-zoom-in group" onClick={() => setSelectedZoomImage(url)}>
+                                <div key={idx} className="flex-shrink-0 w-[400px] aspect-[4/3] rounded-3xl overflow-hidden shadow-xl border border-gray-200 cursor-zoom-in group" onClick={() => setZoomIndex(idx)}>
                                     <img
                                         src={url}
                                         alt={`공고 이미지 ${idx + 1}`}
@@ -242,33 +257,84 @@ export default function ProApplyDetailPage() {
                 {/* Warning Card */}
                 <div className="p-5 bg-red-50 rounded-2xl border border-red-100 flex gap-3">
                     <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                    <div>
+                    <div className="flex-1">
                         <p className="text-xs font-black text-red-800 mb-1">주의사항</p>
                         <p className="text-[11px] font-bold text-red-600 leading-normal">
                             채용 담당자를 사칭하는 사기 등에 주의하시기 바랍니다. <br />
-                            금전을 요구하는 행위는 100% 사기입니다.
+                            금전 요구 및 차량 강매는 100% 사기입니다.
                         </p>
+                        <a
+                            href="http://pf.kakao.com/_XxixizX"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-red-500 hover:bg-red-600 active:scale-95 text-white text-[11px] font-black rounded-lg transition-all shadow-sm"
+                        >
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            신고하기
+                        </a>
                     </div>
                 </div>
             </div>
 
             {/* Image Zoom Modal */}
-            {selectedZoomImage && (
+            {zoomIndex !== null && (
                 <div
-                    className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300"
-                    onClick={() => setSelectedZoomImage(null)}
+                    className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300"
+                    onTouchStart={(e) => setZoomTouchStartX(e.touches[0].clientX)}
+                    onTouchEnd={(e) => {
+                        if (zoomTouchStartX === null) return;
+                        const diff = zoomTouchStartX - e.changedTouches[0].clientX;
+                        if (diff > 50 && zoomIndex < images.length - 1) setZoomIndex(zoomIndex + 1);
+                        else if (diff < -50 && zoomIndex > 0) setZoomIndex(zoomIndex - 1);
+                        setZoomTouchStartX(null);
+                    }}
                 >
+                    {/* Close */}
                     <button
-                        onClick={() => setSelectedZoomImage(null)}
-                        className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                        onClick={() => setZoomIndex(null)}
+                        className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-10"
                     >
                         <X className="w-8 h-8" />
                     </button>
+                    {/* Prev */}
+                    {zoomIndex > 0 && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setZoomIndex(zoomIndex - 1); }}
+                            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-10"
+                        >
+                            <ChevronLeft className="w-7 h-7" />
+                        </button>
+                    )}
+                    {/* Next */}
+                    {zoomIndex < images.length - 1 && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setZoomIndex(zoomIndex + 1); }}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-10"
+                        >
+                            <ChevronLeft className="w-7 h-7 rotate-180" />
+                        </button>
+                    )}
+                    {/* Image */}
                     <img
-                        src={selectedZoomImage}
-                        alt="Zoom View"
-                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in duration-300"
+                        key={zoomIndex}
+                        src={images[zoomIndex]}
+                        alt={`Zoom View ${zoomIndex + 1}`}
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in duration-200 px-16"
+                        onClick={(e) => e.stopPropagation()}
                     />
+                    {/* Dots */}
+                    {images.length > 1 && (
+                        <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-2">
+                            {images.map((_: any, idx: number) => (
+                                <div
+                                    key={idx}
+                                    onClick={() => setZoomIndex(idx)}
+                                    className={`h-1.5 rounded-full transition-all cursor-pointer ${zoomIndex === idx ? 'w-6 bg-white' : 'w-1.5 bg-white/40'
+                                        }`}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
