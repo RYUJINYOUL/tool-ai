@@ -112,7 +112,7 @@ function HomePageContent() {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-6 flex flex-col">
+      <main className="flex-1 px-3 py-6 sm:p-6 flex flex-col">
         <div className="max-w-[1200px] mx-auto w-full animate-fade-in flex-1">
           {activeTab === 'home' && <HomeTab setActiveTab={setActiveTab} />}
           {activeTab === 'schedule' && <ScheduleTab userSchedule={userSchedule} />}

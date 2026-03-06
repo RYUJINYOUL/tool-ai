@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { db, storage } from '@/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import imageCompression from 'browser-image-compression';
 import { useAuth } from '@/context/auth-context';
 import { StorageItem } from '@/types/home';
 
@@ -45,15 +46,32 @@ export function useUserStorage() {
         if (!firebaseUser) return;
         setIsUploadingItem(true);
         try {
+            let fileToUpload = file;
+            try {
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                    fileType: 'image/webp'
+                };
+                const compressedFile = await imageCompression(file, options);
+                fileToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                    type: 'image/webp',
+                    lastModified: Date.now(),
+                });
+            } catch (error) {
+                console.warn("Image compression failed, uploading original:", error);
+            }
+
             const timestamp = Date.now();
             // 파일명 산세타이징 (한글 및 특수문자 제거)
-            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_');
             const storagePath = `userStorage/${firebaseUser.uid}/${timestamp}_${safeName}`;
             const storageRef = ref(storage, storagePath);
 
             // MIME 타입 명시 및 메타데이터 추가
-            await uploadBytes(storageRef, file, {
-                contentType: file.type || 'image/png'
+            await uploadBytes(storageRef, fileToUpload, {
+                contentType: 'image/webp'
             });
 
             const downloadURL = await getDownloadURL(storageRef);

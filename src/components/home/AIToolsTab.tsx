@@ -119,6 +119,11 @@ export default function AIToolsTab({
                 </div>
             </div>
 
+            <h4 className="font-bold text-gray-700 flex items-center gap-2 mb-1 mt-10 mx-2">
+                <ImagePlus className="w-5 h-5 text-blue-500" />
+                exe 서비스 (.exe)
+            </h4>
+
 
             {/* ── 게시판 섹션 (리디자인) ── */}
             <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">

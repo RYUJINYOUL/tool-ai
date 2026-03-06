@@ -16,6 +16,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import imageCompression from 'browser-image-compression';
 import { useAuth } from '@/context/auth-context';
 import { ADMIN_UID } from '@/lib/constants';
 
@@ -86,11 +87,31 @@ export function useAIBoard(type: 'intro' | 'suggestion') {
         // Upload images if any
         const imageUrls: string[] = [];
         for (const file of imageFiles) {
+            let fileToUpload = file;
+            try {
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                    fileType: 'image/webp'
+                };
+                const compressedFile = await imageCompression(file, options);
+                // 원본 파일 이름 유지하되 확장자만 webp로 변경한 새로운 File 객체 생성
+                fileToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                    type: 'image/webp',
+                    lastModified: Date.now(),
+                });
+            } catch (error) {
+                console.warn("Image compression failed, uploading original:", error);
+            }
+
             const timestamp = Date.now();
-            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_');
             const storagePath = `ai-board/${type}/${timestamp}_${safeName}`;
             const storageRef = ref(storage, storagePath);
-            await uploadBytes(storageRef, file);
+            await uploadBytes(storageRef, fileToUpload, {
+                contentType: 'image/webp'
+            });
             const url = await getDownloadURL(storageRef);
             imageUrls.push(url);
         }
@@ -117,11 +138,30 @@ export function useAIBoard(type: 'intro' | 'suggestion') {
         // Upload NEW images if any
         const newImageUrls: string[] = [...existingImages];
         for (const file of imageFiles) {
+            let fileToUpload = file;
+            try {
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                    fileType: 'image/webp'
+                };
+                const compressedFile = await imageCompression(file, options);
+                fileToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                    type: 'image/webp',
+                    lastModified: Date.now(),
+                });
+            } catch (error) {
+                console.warn("Image compression failed, uploading original:", error);
+            }
+
             const timestamp = Date.now();
-            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_');
             const storagePath = `ai-board/${type}/${timestamp}_${safeName}`;
             const storageRef = ref(storage, storagePath);
-            await uploadBytes(storageRef, file);
+            await uploadBytes(storageRef, fileToUpload, {
+                contentType: 'image/webp'
+            });
             const url = await getDownloadURL(storageRef);
             newImageUrls.push(url);
         }
@@ -170,11 +210,30 @@ export function useAIBoard(type: 'intro' | 'suggestion') {
 
         const imageUrls: string[] = [];
         for (const file of imageFiles) {
+            let fileToUpload = file;
+            try {
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                    fileType: 'image/webp'
+                };
+                const compressedFile = await imageCompression(file, options);
+                fileToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                    type: 'image/webp',
+                    lastModified: Date.now(),
+                });
+            } catch (error) {
+                console.warn("Image compression failed, uploading original:", error);
+            }
+
             const timestamp = Date.now();
-            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_');
             const storagePath = `ai-board/suggestion/${postId}_${timestamp}_${safeName}`;
             const storageRef = ref(storage, storagePath);
-            await uploadBytes(storageRef, file);
+            await uploadBytes(storageRef, fileToUpload, {
+                contentType: 'image/webp'
+            });
             const url = await getDownloadURL(storageRef);
             imageUrls.push(url);
         }
@@ -195,11 +254,30 @@ export function useAIBoard(type: 'intro' | 'suggestion') {
 
         const newUrls = [...existingImages];
         for (const file of imageFiles) {
+            let fileToUpload = file;
+            try {
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                    fileType: 'image/webp'
+                };
+                const compressedFile = await imageCompression(file, options);
+                fileToUpload = new File([compressedFile], file.name.replace(/\.[^/.]+$/, "") + ".webp", {
+                    type: 'image/webp',
+                    lastModified: Date.now(),
+                });
+            } catch (error) {
+                console.warn("Image compression failed, uploading original:", error);
+            }
+
             const timestamp = Date.now();
-            const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_');
             const storagePath = `ai-board/suggestion/${postId}_${timestamp}_${safeName}`;
             const storageRef = ref(storage, storagePath);
-            await uploadBytes(storageRef, file);
+            await uploadBytes(storageRef, fileToUpload, {
+                contentType: 'image/webp'
+            });
             const url = await getDownloadURL(storageRef);
             newUrls.push(url);
         }

@@ -57,7 +57,7 @@ export default function HomeTab({ setActiveTab }: HomeTabProps) {
                                     { text: "구인 공고를 더 쉽게 올려 보시겠어요", tab: 'ai' },
                                     { text: "팀원 근무일을 좀 더 편하게 관리하세요", tab: 'schedule' },
                                     { text: "팀원들과 정산은 아주 가볍게 매일매일", tab: 'schedule' },
-                                    { text: "혹시 자동화 툴이 필요 하신가요?", tab: 'memo' }
+                                    { text: "혹시 자동화 툴이 필요 하신가요?", tab: 'ai' }
                                 ].map((item, i) => (
                                     <div
                                         key={i}

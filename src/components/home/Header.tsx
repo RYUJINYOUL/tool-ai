@@ -40,7 +40,7 @@ export default function Header({ userSchedule, activeTab, setActiveTab }: Header
     };
 
     return (
-        <header className="w-full px-6 py-4 flex items-center justify-between bg-white sticky top-0 z-50 border-b border-gray-100 shadow-sm">
+        <header className="w-full px-3 py-4 sm:px-6 flex items-center justify-between bg-white sticky top-0 z-50 border-b border-gray-100 shadow-sm">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 overflow-hidden p-1">
                     <img src="/logo512.png" className="w-full h-full object-contain" alt="Yongcar" />

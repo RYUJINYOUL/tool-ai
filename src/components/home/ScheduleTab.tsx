@@ -105,11 +105,11 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
     return (
         <div className="flex flex-col gap-6 max-w-[1400px] mx-auto">
             {/* Top Buttons */}
-            <div className="flex justify-center -mb-2 px-4 w-full">
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-3">
+            <div className="w-full">
+                <div className="flex overflow-x-auto sm:overflow-visible gap-3 px-4 pb-4 sm:pb-0 sm:justify-center no-scrollbar snap-x snap-mandatory">
                     <button
                         onClick={() => userSchedule ? router.push(`/schedule/view/${userSchedule.shortId}`) : router.push('/schedule/create')}
-                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-400 to-blue-400 text-white w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
+                        className="flex-shrink-0 snap-center flex items-center justify-center gap-2 bg-gradient-to-r from-blue-400 to-blue-400 text-white w-[260px] sm:w-auto px-6 sm:px-8 py-4 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         {userSchedule ? (
                             <>
@@ -135,7 +135,7 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                             }
                         }}
 
-                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-pink-300 to-pink-300 text-white w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
+                        className="flex-shrink-0 snap-center flex items-center justify-center gap-2 bg-gradient-to-r from-pink-300 to-pink-300 text-white w-[260px] sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         {userSchedule ? (
                             <>
@@ -161,7 +161,7 @@ export default function ScheduleTab({ userSchedule }: ScheduleTabProps) {
                                 router.push('/schedule/create');
                             }
                         }}
-                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-400 to-emerald-400 text-white w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
+                        className="flex-shrink-0 snap-center flex items-center justify-center gap-2 bg-gradient-to-r from-green-400 to-emerald-400 text-white w-[260px] sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all font-bold active:scale-95"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
