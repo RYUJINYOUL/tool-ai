@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { CircleChevronUp, StickyNote, ChevronDown, Link as LinkIcon, X, ZoomIn, Search, Sparkles, Loader2, Phone, Briefcase, UserSearch, MapPin, CreditCard, Box, Award, PieChart, Plus, Smartphone, Play, Apple, Globe, ExternalLink, Camera } from 'lucide-react';
 import { useNotices } from '@/hooks/useNotices';
 import { useProApply } from '@/hooks/useProApply';
@@ -42,6 +43,33 @@ export default function NoticeBoard() {
     const [filteredIds, setFilteredIds] = useState<string[] | null>(null);
     const [isFilterActive, setIsFilterActive] = useState(false);
     const [regionSearch, setRegionSearch] = useState('');
+
+    /** 지역 + SubCategories 검색. 공백/쉼표로 여러 키워드 가능(AND). cj ↔ 씨제이 통합 매칭 */
+    const matchesRegionAndCategorySearch = (item: any, searchInput: string): boolean => {
+        const keywords = searchInput
+            .split(/[\s,]+/)
+            .map((k) => k.trim().toLowerCase())
+            .filter((k) => k.length > 0);
+        if (keywords.length === 0) return true;
+
+        const regionText = [
+            item.deliverAddress,
+            item.address,
+            item.title,
+            item.company,
+            (item.SubCategories || ''),
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+
+        return keywords.every((kw) => {
+            if (kw === 'cj' || kw === '씨제이') {
+                return regionText.includes('cj') || regionText.includes('씨제이');
+            }
+            return regionText.includes(kw);
+        });
+    };
 
     const handleAISearch = async (queryText: string) => {
         if (!isLoggedIn) {
@@ -215,42 +243,38 @@ export default function NoticeBoard() {
 
                     {/* Sub-tabs for Job Search */}
                     {activeTab === '택배구인' && (
-                        <div className="px-5 py-3 bg-gray-50/50 flex flex-col gap-2">
-                            <div className="flex gap-2">
-                                <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-white rounded-xl shadow-sm border border-gray-100 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                                    <Search className="w-4 h-4 text-gray-400" />
+                        <div className="px-4 sm:px-5 py-3 bg-gray-50/50 flex flex-col gap-2 min-w-0 overflow-hidden">
+                            <div className="flex flex-col sm:flex-row gap-2 min-w-0 w-full">
+                                <div className="flex-1 flex items-center gap-2 min-w-0 px-3 py-2 bg-white rounded-xl shadow-sm border border-gray-100 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
                                     <input
                                         type="text"
-                                        placeholder="지역 검색 (예: 강남구, 도곡동)"
+                                        placeholder="강남구 쿠팡 / 씨제이 / 강남구 "
                                         value={regionSearch}
                                         onChange={(e) => setRegionSearch(e.target.value)}
-                                        className="flex-1 bg-transparent outline-none text-sm font-bold placeholder:text-gray-300"
+                                        className="flex-1 min-w-0 bg-transparent outline-none text-sm font-bold placeholder:text-gray-300"
                                     />
                                 </div>
-                                <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap">
-                                    <Briefcase className="w-4 h-4 text-blue-500" />
-                                    {isFilterActive || regionSearch ? '검색된' : '현재'} 택배 일자리 {
-                                        (() => {
-                                            let allJobs = Array.from(new Map([...proApplyPosts, ...notices.filter(n => n.categoryName === '택배구인' || n.categoryName === '구인구직')].map(item => [item.id, item])).values());
+                                <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-blue-50 text-blue-600 border border-blue-100 shrink-0 sm:shrink-0 w-full sm:w-auto">
+                                    <Briefcase className="w-4 h-4 text-blue-500 shrink-0" />
+                                    <span className="truncate">
+                                        {isFilterActive || regionSearch ? '검색된' : '현재'} 택배 일자리 {
+                                            (() => {
+                                                let allJobs = Array.from(new Map([...proApplyPosts, ...notices.filter(n => n.categoryName === '택배구인' || n.categoryName === '구인구직')].map(item => [item.id, item])).values());
 
-                                            // Apply AI filter
-                                            if (isFilterActive && filteredIds) {
-                                                allJobs = allJobs.filter(j => filteredIds.includes(j.id));
-                                            }
+                                                if (isFilterActive && filteredIds) {
+                                                    allJobs = allJobs.filter(j => filteredIds.includes(j.id));
+                                                }
 
-                                            // Apply Region filter
-                                            if (regionSearch.trim()) {
-                                                const searchLower = regionSearch.toLowerCase();
-                                                allJobs = allJobs.filter(j =>
-                                                    ((j as any).deliverAddress || (j as any).address || '').toLowerCase().includes(searchLower) ||
-                                                    (j.title || '').toLowerCase().includes(searchLower) ||
-                                                    ((j as any).company || '').toLowerCase().includes(searchLower)
-                                                );
-                                            }
+                                                if (regionSearch.trim()) {
+                                                    const searchLower = regionSearch.trim().toLowerCase();
+                                                    allJobs = allJobs.filter(j => matchesRegionAndCategorySearch(j, searchLower));
+                                                }
 
-                                            return allJobs.length;
-                                        })()
-                                    }건
+                                                return allJobs.length;
+                                            })()
+                                        }건
+                                    </span>
                                 </div>
                             </div>
 
@@ -262,9 +286,9 @@ export default function NoticeBoard() {
                                         setSearchQuery('');
                                         setRegionSearch('');
                                     }}
-                                    className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                                    className="flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors w-full sm:w-auto"
                                 >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="w-3.5 h-3.5 shrink-0" />
                                     전체 필터 해제
                                 </button>
                             )}
@@ -304,14 +328,10 @@ export default function NoticeBoard() {
                                 displayData = displayData.filter(item => filteredIds.includes(item.id));
                             }
 
-                            // Apply manual region filter if active
+                            // Apply manual region + SubCategories filter if active
                             if (regionSearch.trim()) {
-                                const searchLower = regionSearch.toLowerCase();
-                                displayData = displayData.filter(item =>
-                                    ((item as any).deliverAddress || (item as any).address || '').toLowerCase().includes(searchLower) ||
-                                    (item.title || '').toLowerCase().includes(searchLower) ||
-                                    ((item as any).company || '').toLowerCase().includes(searchLower)
-                                );
+                                const searchLower = regionSearch.trim().toLowerCase();
+                                displayData = displayData.filter(item => matchesRegionAndCategorySearch(item, searchLower));
                             }
 
                             if (displayData.length === 0) {
@@ -482,18 +502,21 @@ export default function NoticeBoard() {
                         <div className="h-10"></div>
                     </div>
 
-                    {activeTab === '택배구인' && (
-                        <div className="absolute bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
-                            <button
-                                onClick={() => setShowAppInstall(true)}
-                                className="flex items-center gap-2 px-8 py-4 bg-[#4CAF50] text-white rounded-full font-black text-[15px] shadow-2xl hover:bg-[#45a049] transition-all transform hover:scale-105 active:scale-95 pointer-events-auto"
-                            >
-                                <Smartphone className="w-5 h-5" />
-                                용카앱 설치
-                            </button>
-                        </div>
-                    )}
                 </div>
+            )}
+
+            {/* 용카앱 설치 버튼: body에 포털로 렌더링해 스크롤과 무관하게 화면 하단 고정 */}
+            {typeof document !== 'undefined' && isNoticeOpen && activeTab === '택배구인' && ReactDOM.createPortal(
+                <div className="fixed bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
+                    <button
+                        onClick={() => setShowAppInstall(true)}
+                        className="flex items-center gap-2 px-8 py-4 bg-[#4CAF50] text-white rounded-full font-black text-[15px] shadow-2xl hover:bg-[#45a049] transition-all transform hover:scale-105 active:scale-95 pointer-events-auto"
+                    >
+                        <Smartphone className="w-5 h-5" />
+                        용카앱 설치
+                    </button>
+                </div>,
+                document.body
             )}
 
             <AppInstallDialog isOpen={showAppInstall} onClose={() => setShowAppInstall(false)} />
@@ -604,7 +627,7 @@ function AISearchBar({ onSearch, isSearching, initialValue }: { onSearch: (q: st
             </div>
             <input
                 type="text"
-                placeholder="AI검색 예) 일산 500만원 수익 택배 일자리 있어"
+                placeholder="AI검색 : 일산 500만원 수익 택배 일자리"
                 value={localQuery}
                 onChange={(e) => setLocalQuery(e.target.value)}
                 className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-[15px] outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner"
