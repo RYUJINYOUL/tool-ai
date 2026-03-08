@@ -96,7 +96,7 @@ ${resultData.description}
         setIsSaving(true);
         try {
             const text = `
-[AI 정리 결과 : 출처 tool-ai.kr ]
+
 □ 택배사명 : ${resultData.courier}
 □ 배송지 주소 : ${resultData.delivery_address}
 □ 터미널 주소 : ${resultData.terminal_address}
@@ -108,6 +108,7 @@ ${resultData.description}
 □ 화물운송자격증 : ${resultData.license}
 □ 모집마감 : ${resultData.deadline}
 □ 연락처 : ${resultData.contact}
+[AI 정리 결과 : 출처 tool-ai.kr ]
 
 □ 상세설명
 ${resultData.description}

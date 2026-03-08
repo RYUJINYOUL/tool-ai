@@ -2,13 +2,17 @@
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ImageIcon, Loader2, FileText, ExternalLink, Trash2, FileCode, X, Copy, DownloadCloud } from 'lucide-react';
+import { ImageIcon, Loader2, FileText, ExternalLink, Trash2, FileCode, X, Copy, DownloadCloud, Truck } from 'lucide-react';
 import { useUserStorage } from '@/hooks/useUserStorage';
 import { StorageItem } from '@/types/home';
+import { useAuth } from '@/context/auth-context';
+import JobPostingModal from './JobPostingModal';
 
 export default function StorageTab() {
     const [newTextNote, setNewTextNote] = useState('');
     const [selectedItem, setSelectedItem] = useState<StorageItem | null>(null);
+    const [isPostingModalOpen, setIsPostingModalOpen] = useState(false);
+    const { isLoggedIn } = useAuth();
     const {
         storageItems,
         isStorageLoading,
@@ -89,7 +93,7 @@ export default function StorageTab() {
             </div>
 
             {/* Input Area */}
-            <div className="mb-10">
+            <div className="mb-5">
                 <div className="relative group">
                     <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl blur opacity-5 group-focus-within:opacity-10 transition duration-500"></div>
                     <div className="relative flex flex-col md:flex-row gap-3 bg-white rounded-2xl p-2 border border-gray-100 shadow-sm focus-within:border-blue-300 transition-all">
@@ -109,6 +113,20 @@ export default function StorageTab() {
                     </div>
                 </div>
             </div>
+
+            {/* Job Posting Button (Visible to logged-in users) */}
+            {isLoggedIn && (
+                <div className="mb-6">
+                    <button
+                        onClick={() => setIsPostingModalOpen(true)}
+                        className="w-full py-3 bg-gradient-to-r from-blue-300 to-indigo-300 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+                    >
+                        <Truck className="w-6 h-6 group-hover:animate-bounce" />
+                        <span>용카 구인 등록</span>
+                    </button>
+
+                </div>
+            )}
 
             {/* Storage Items List */}
             <div className="flex-1">
@@ -222,6 +240,16 @@ export default function StorageTab() {
                             ) : (
                                 <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 whitespace-pre-wrap text-gray-700 leading-relaxed font-medium text-sm">
                                     {selectedItem.content}
+                                    {(selectedItem as any).link && (
+                                        <a
+                                            href={(selectedItem as any).link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-4 flex items-center gap-2 w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all active:scale-95 justify-center"
+                                        >
+                                            공고 바로가기 →
+                                        </a>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -279,6 +307,11 @@ export default function StorageTab() {
                 </div>,
                 document.body
             )}
+
+            <JobPostingModal
+                isOpen={isPostingModalOpen}
+                onClose={() => setIsPostingModalOpen(false)}
+            />
         </div>
     );
 }

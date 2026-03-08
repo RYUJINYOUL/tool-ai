@@ -42,7 +42,8 @@ export default function HomeTab({ setActiveTab }: HomeTabProps) {
                         <input
                             type="text"
                             placeholder="주요 업무를 선택 하세요"
-                            className="w-full px-5 py-3 text-base outline-none text-gray-700 placeholder-gray-400 font-medium"
+                            className="w-full px-5 py-3 text-base outline-none text-gray-700 placeholder-gray-400 font-medium cursor-pointer"
+                            readOnly
                             onFocus={() => setIsSearchFocused(true)}
                             onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                         />

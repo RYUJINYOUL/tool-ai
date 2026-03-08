@@ -9,7 +9,7 @@ import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, Timestamp, deleteDoc, doc } from 'firebase/firestore';
 
 /** Smart Region Mapping: City -> Province */
 const CITY_TO_PROVINCE_MAP: Record<string, string> = {
@@ -54,7 +54,7 @@ export default function NoticeBoard() {
     const { notices, isNoticesLoading } = useNotices();
     const { posts: proApplyPosts, loading: isProApplyLoading } = useProApply();
     const { equipment, loading: isEquipmentLoading } = useEquipment();
-    const { isLoggedIn } = useAuth();
+    const { firebaseUser, isLoggedIn } = useAuth();
     const searchParams = useSearchParams();
     const router = useRouter();
 
@@ -187,6 +187,20 @@ export default function NoticeBoard() {
 
             return regionText.includes(kw);
         });
+    };
+
+    const handleDelete = async (id: string, collectionName: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!window.confirm('정말 삭제하시겠습니까?')) return;
+
+        try {
+            await deleteDoc(doc(db, collectionName, id));
+            alert('삭제되었습니다.');
+            // list will refresh automatically due to onSnapshot in hooks
+        } catch (error) {
+            console.error('Error deleting document:', error);
+            alert('삭제 중 오류가 발생했습니다.');
+        }
     };
 
     const handleAISearch = async (queryText: string) => {
@@ -643,7 +657,7 @@ export default function NoticeBoard() {
                                                         </span>
                                                     )}
                                                     {notice.author && !notice.company && (
-                                                        <span className="text-[10px] font-bold text-gray-400">
+                                                        <span className="text-[10px] font-black text-gray-400">
                                                             {notice.author}
                                                         </span>
                                                     )}
@@ -655,12 +669,27 @@ export default function NoticeBoard() {
                                                     })()}
                                                 </h4>
                                             </div>
-                                            <span className="text-[10px] text-gray-400 font-bold whitespace-nowrap bg-gray-50 px-2 py-1 rounded-lg">
-                                                {notice.createdAt instanceof Date
-                                                    ? notice.createdAt.toLocaleDateString('ko-KR')
-                                                    : '정보 없음'
-                                                }
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-400 font-bold whitespace-nowrap bg-gray-50 px-2 py-1 rounded-lg">
+                                                    {notice.createdAt instanceof Date
+                                                        ? notice.createdAt.toLocaleDateString('ko-KR')
+                                                        : '정보 없음'
+                                                    }
+                                                </span>
+                                                {firebaseUser?.uid === 'cYjFpXKkvhe4vt4FU26XtMHwm1j2' && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            const isProApply = proApplyPosts.some(p => p.id === notice.id);
+                                                            const collectionName = isProApply ? 'proApply' : 'community';
+                                                            handleDelete(notice.id, collectionName, e);
+                                                        }}
+                                                        className="p-1 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                                                        title="삭제"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {(isHiring || isEquipment) && (
