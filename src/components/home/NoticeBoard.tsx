@@ -1,12 +1,48 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { CircleChevronUp, StickyNote, ChevronDown, Link as LinkIcon, X, ZoomIn, Search, Sparkles, Loader2, Phone, Briefcase, UserSearch, MapPin, CreditCard, Box, Award, PieChart, Plus, Smartphone, Play, Apple, Globe, ExternalLink, Camera, MessageSquare } from 'lucide-react';
+import { CircleChevronUp, StickyNote, ChevronDown, Link as LinkIcon, X, ZoomIn, Search, Sparkles, Loader2, Phone, Briefcase, UserSearch, MapPin, CreditCard, Box, Award, PieChart, Plus, Smartphone, Play, Apple, Globe, ExternalLink, Camera, MessageSquare, Truck } from 'lucide-react';
 import { useNotices } from '@/hooks/useNotices';
 import { useProApply } from '@/hooks/useProApply';
 import { useProfessionals } from '@/hooks/useProfessionals';
+import { useEquipment } from '@/hooks/useEquipment';
 import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, Timestamp } from 'firebase/firestore';
+
+/** Smart Region Mapping: City -> Province */
+const CITY_TO_PROVINCE_MAP: Record<string, string> = {
+    // Gyeonggi
+    '수원': '경기', '성남': '경기', '안양': '경기', '부천': '경기', '광명': '경기', '평택': '경기', '안산': '경기',
+    '고양': '경기', '과천': '경기', '구리': '경기', '남양주': '경기', '오산': '경기', '시흥': '경기', '군포': '경기',
+    '의왕': '경기', '하남': '경기', '파주': '경기', '이천': '경기', '안성': '경기', '김포': '경기', '화성': '경기',
+    '광주': '경기', '양주': '경기', '포천': '경기', '여주': '경기', '연천': '경기', '가평': '경기', '양평': '경기',
+    // Gangwon
+    '춘천': '강원', '원주': '강원', '강릉': '강원', '동해': '강원', '태백': '강원', '속초': '강원', '삼척': '강원',
+    '홍천': '강원', '횡성': '강원', '영월': '강원', '평창': '강원', '정선': '강원', '철원': '강원', '화천': '강원',
+    '양구': '강원', '인제': '강원', '양양': '강원',
+    // Chungbuk
+    '청주': '충북', '충주': '충북', '제천': '충북', '보은': '충북', '옥천': '충북', '영동': '충북', '증평': '충북',
+    '진천': '충북', '괴산': '충북', '음성': '충북', '단양': '충북',
+    // Chungnam
+    '천안': '충남', '공주': '충남', '보령': '충남', '아산': '충남', '서산': '충남', '논산': '충남', '계룡': '충남',
+    '당진': '충남', '금산': '충남', '부여': '충남', '서천': '충남', '청양': '충남', '홍성': '충남', '예산': '충남', '태안': '충남',
+    // Jeonbuk
+    '전주': '전북', '군산': '전북', '익산': '전북', '정읍': '전북', '남원': '전북', '김제': '전북', '완주': '전북',
+    '진안': '전북', '무주': '전북', '장수': '전북', '임실': '전북', '순창': '전북', '고창': '전북', '부안': '전북',
+    // Jeonnam
+    '목포': '전남', '여수': '전남', '순천': '전남', '나주': '전남', '광양': '전남', '담양': '전남', '곡성': '전남',
+    '구례': '전남', '고흥': '전남', '보성': '전남', '화순': '전남', '장흥': '전남', '강진': '전남', '해남': '전남',
+    '영암': '전남', '무안': '전남', '함평': '전남', '영광': '전남', '장성': '전남', '완도': '전남', '진도': '전남', '신안': '전남',
+    // Gyeongbuk
+    '포항': '경북', '경주': '경북', '김천': '경북', '안동': '경북', '구미': '경북', '영주': '경북', '영천': '경북',
+    '상주': '경북', '문경': '경북', '경산': '경북', '칠곡': '경북', '예천': '경북', '봉화': '경북', '울진': '경북',
+    // Gyeongnam
+    '창원': '경남', '진주': '경남', '통영': '경남', '사천': '경남', '김해': '경남', '밀양': '경남', '거제': '경남',
+    '양산': '경남', '거창': '경남', '함안': '경남', '창녕': '경남', '고성': '경남',
+    '남해': '경남', '하동': '경남', '산청': '경남', '함양': '경남', '합천': '경남'
+};
 
 export default function NoticeBoard() {
     const [isNoticeOpen, setIsNoticeOpen] = useState(false);
@@ -14,8 +50,10 @@ export default function NoticeBoard() {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('택배구인');
     const [showAppInstall, setShowAppInstall] = useState(false);
+    const [showDispatchDialog, setShowDispatchDialog] = useState(false);
     const { notices, isNoticesLoading } = useNotices();
     const { posts: proApplyPosts, loading: isProApplyLoading } = useProApply();
+    const { equipment, loading: isEquipmentLoading } = useEquipment();
     const { isLoggedIn } = useAuth();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -43,6 +81,8 @@ export default function NoticeBoard() {
     const [filteredIds, setFilteredIds] = useState<string[] | null>(null);
     const [isFilterActive, setIsFilterActive] = useState(false);
     const [regionSearch, setRegionSearch] = useState('');
+    const [aiTimeline, setAiTimeline] = useState<any[]>([]);
+    const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
     const noticeScrollRef = useRef<HTMLDivElement | null>(null);
 
     const NOTICE_SCROLL_KEY = 'noticeBoardScrollTop';
@@ -72,6 +112,27 @@ export default function NoticeBoard() {
         const saved = sessionStorage.getItem(NOTICE_SCROLL_KEY);
         if (saved !== null) setIsNoticeOpen(true);
     }, []);
+
+    /** Fetch AI Timeline from Firebase */
+    useEffect(() => {
+        const fetchTimeline = async () => {
+            try {
+                const q = query(collection(db, 'aitimeline'), orderBy('createdAt', 'desc'), limit(20));
+                const snapshot = await getDocs(q);
+                const history = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                setAiTimeline(history);
+            } catch (error) {
+                console.error('Error fetching AI timeline:', error);
+            }
+        };
+
+        if (isNoticeOpen) {
+            fetchTimeline();
+        }
+    }, [isNoticeOpen]);
 
     /** 패널 열림 시 저장된 스크롤 위치 복원 */
     useEffect(() => {
@@ -103,7 +164,9 @@ export default function NoticeBoard() {
             item.address,
             item.title,
             item.company,
-            (item.SubCategories || ''),
+            item.equipment_name,
+            item.equipment_career,
+            (Array.isArray(item.SubCategories) ? item.SubCategories.join(' ') : (item.SubCategories || '')),
         ]
             .filter(Boolean)
             .join(' ')
@@ -113,6 +176,15 @@ export default function NoticeBoard() {
             if (kw === 'cj' || kw === '씨제이') {
                 return regionText.includes('cj') || regionText.includes('씨제이');
             }
+
+            // Smart Search for Equipment
+            if (activeTab === '용차출동') {
+                const province = CITY_TO_PROVINCE_MAP[kw];
+                if (province) {
+                    return regionText.includes(kw) || regionText.includes(province);
+                }
+            }
+
             return regionText.includes(kw);
         });
     };
@@ -193,8 +265,9 @@ export default function NoticeBoard() {
                 // Extract IDs for filtering the main list
                 const idRegex = /(?:\[ID:|ID:|\(ID:)\s*([a-zA-Z0-9_-]{20,})[\]\)]?/g;
                 const matches = data.answer.match(idRegex);
+                let extractedIds: string[] = [];
                 if (matches) {
-                    const extractedIds = Array.from(new Set(matches.map((m: string) => {
+                    extractedIds = Array.from(new Set(matches.map((m: string) => {
                         const innerMatch = m.match(/[a-zA-Z0-9_-]{20,}/);
                         return innerMatch ? innerMatch[0] : null;
                     }).filter(Boolean))) as string[];
@@ -203,6 +276,23 @@ export default function NoticeBoard() {
                         setFilteredIds(extractedIds);
                         setIsFilterActive(true);
                     }
+                }
+
+                // Save to Firebase AI Timeline
+                try {
+                    await addDoc(collection(db, 'aitimeline'), {
+                        query: queryText,
+                        answer: data.answer,
+                        filteredIds: extractedIds,
+                        createdAt: serverTimestamp()
+                    });
+
+                    // Refresh local timeline state
+                    const q = query(collection(db, 'aitimeline'), orderBy('createdAt', 'desc'), limit(20));
+                    const snapshot = await getDocs(q);
+                    setAiTimeline(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                } catch (saveError) {
+                    console.error('Error saving to AI timeline:', saveError);
                 }
             } else {
                 setAiResult('검색 결과를 찾을 수 없습니다.');
@@ -270,6 +360,63 @@ export default function NoticeBoard() {
                             isSearching={isAiSearching}
                             initialValue={searchQuery}
                         />
+
+                        {/* AI Search Timeline */}
+                        <div className="mt-4">
+                            <button
+                                onClick={() => setIsTimelineExpanded(!isTimelineExpanded)}
+                                className="flex items-center justify-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold border w-full transition-colors bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 shadow-sm active:scale-[0.98]"
+                            >
+                                <Sparkles className={`w-3.5 h-3.5 ${isTimelineExpanded ? 'text-blue-500' : 'text-blue-400'}`} />
+                                AI 검색 타임라인 {aiTimeline.length > 0 && `(${aiTimeline.length})`}
+                                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isTimelineExpanded ? 'rotate-180 text-blue-500' : ''}`} />
+                            </button>
+
+                            {isTimelineExpanded && (
+                                <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    {aiTimeline.length > 0 ? (
+                                        aiTimeline.map((item, idx) => (
+                                            <div
+                                                key={item.id || idx}
+                                                onClick={() => {
+                                                    setSearchQuery(item.query);
+                                                    setAiResult(item.answer);
+                                                    if (item.filteredIds && item.filteredIds.length > 0) {
+                                                        setFilteredIds(item.filteredIds);
+                                                        setIsFilterActive(true);
+                                                    } else {
+                                                        setFilteredIds(null);
+                                                        setIsFilterActive(false);
+                                                    }
+                                                    setShowAiModal(true);
+                                                }}
+                                                className="group flex flex-col p-3 bg-gray-50 hover:bg-blue-50 rounded-xl border border-transparent hover:border-blue-100 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+                                            >
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="text-[13px] font-black text-gray-800 group-hover:text-blue-700 line-clamp-1">
+                                                        {item.query}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 font-bold shrink-0 ml-2">
+                                                        {item.createdAt instanceof Timestamp
+                                                            ? item.createdAt.toDate().toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                                            : item.createdAt?.seconds
+                                                                ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                                                : '방금 전'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-gray-500 line-clamp-1 group-hover:text-blue-600/70">
+                                                    {item.answer?.replace(/\[ID:[^\]]+\]/g, '').trim()}
+                                                </p>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-center py-4 text-xs font-bold text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                            최근 검색 내역이 없습니다.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Tab Navigation */}
@@ -288,37 +435,51 @@ export default function NoticeBoard() {
                         ))}
                     </div>
 
-                    {/* Sub-tabs for Job Search */}
-                    {activeTab === '택배구인' && (
+                    {/* Sub-tabs for Job / Equipment Search */}
+                    {(activeTab === '택배구인' || activeTab === '용차출동') && (
                         <div className="px-4 sm:px-5 py-3 bg-gray-50/50 flex flex-col gap-2 min-w-0 overflow-hidden">
                             <div className="flex flex-col sm:flex-row gap-2 min-w-0 w-full">
-                                <div className="flex-1 flex items-center gap-2 min-w-0 px-3 py-2 bg-white rounded-xl shadow-sm border border-gray-100 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                                <div className={`flex-1 flex items-center gap-2 min-w-0 px-3 py-2 bg-white rounded-xl shadow-sm border border-gray-100 transition-all focus-within:ring-2 ${activeTab === '택배구인'
+                                    ? 'focus-within:border-green-400 focus-within:ring-green-100'
+                                    : 'focus-within:border-blue-400 focus-within:ring-blue-100'
+                                    }`}>
+                                    <Search className={`w-4 h-4 shrink-0 ${activeTab === '택배구인' ? 'text-green-400' : 'text-blue-400'}`} />
                                     <input
                                         type="text"
-                                        placeholder="강남구 쿠팡 / 씨제이 / 강남구 "
+                                        placeholder={activeTab === '택배구인' ? "강남구 쿠팡 / 씨제이 / 강남구 " : "지역 + 택배 또는 냉장 냉동 (예: 광주 택배, 광주 1톤냉동 )"}
                                         value={regionSearch}
                                         onChange={(e) => setRegionSearch(e.target.value)}
                                         className="flex-1 min-w-0 bg-transparent outline-none text-sm font-bold placeholder:text-gray-300"
                                     />
                                 </div>
-                                <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-blue-50 text-blue-600 border border-blue-100 shrink-0 sm:shrink-0 w-full sm:w-auto">
-                                    <Briefcase className="w-4 h-4 text-blue-500 shrink-0" />
+                                <div className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border shrink-0 sm:shrink-0 w-full sm:w-auto transition-colors ${activeTab === '택배구인'
+                                    ? 'bg-green-50 text-green-600 border-green-100'
+                                    : 'bg-blue-50 text-blue-600 border-blue-100'
+                                    }`}>
+                                    {activeTab === '택배구인'
+                                        ? <Briefcase className="w-4 h-4 text-green-500 shrink-0" />
+                                        : <Truck className="w-4 h-4 text-blue-500 shrink-0" />
+                                    }
                                     <span className="truncate">
-                                        {isFilterActive || regionSearch ? '검색된' : '현재'} 택배 일자리 {
+                                        {isFilterActive || regionSearch ? '검색된' : '현재'} {activeTab === '택배구인' ? '택배 일자리' : '용차 정보'} {
                                             (() => {
-                                                let allJobs = Array.from(new Map([...proApplyPosts, ...notices.filter(n => n.categoryName === '택배구인' || n.categoryName === '구인구직')].map(item => [item.id, item])).values());
+                                                let dataSet = [];
+                                                if (activeTab === '택배구인') {
+                                                    dataSet = Array.from(new Map([...proApplyPosts, ...notices.filter(n => n.categoryName === '택배구인' || n.categoryName === '구인구직')].map(item => [item.id, item])).values());
+                                                } else {
+                                                    dataSet = equipment;
+                                                }
 
                                                 if (isFilterActive && filteredIds) {
-                                                    allJobs = allJobs.filter(j => filteredIds.includes(j.id));
+                                                    dataSet = dataSet.filter(j => filteredIds.includes(j.id));
                                                 }
 
                                                 if (regionSearch.trim()) {
                                                     const searchLower = regionSearch.trim().toLowerCase();
-                                                    allJobs = allJobs.filter(j => matchesRegionAndCategorySearch(j, searchLower));
+                                                    dataSet = dataSet.filter(j => matchesRegionAndCategorySearch(j, searchLower));
                                                 }
 
-                                                return allJobs.length;
+                                                return dataSet.length;
                                             })()
                                         }건
                                     </span>
@@ -344,7 +505,7 @@ export default function NoticeBoard() {
 
                     {/* Content Area */}
                     <div className="p-4 space-y-4 bg-gray-50/50 pb-24">
-                        {((activeTab === '택배구인' && isProApplyLoading) || (activeTab !== '택배구인' && isNoticesLoading)) ? (
+                        {((activeTab === '택배구인' && isProApplyLoading) || (activeTab === '용차출동' && isEquipmentLoading) || (activeTab !== '택배구인' && activeTab !== '용차출동' && isNoticesLoading)) ? (
                             <div className="space-y-4">
                                 {[1, 2, 3, 4].map(i => (
                                     <div key={i} className="animate-pulse flex flex-col gap-3 p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
@@ -366,6 +527,22 @@ export default function NoticeBoard() {
                                 displayData = [...proApplyPosts, ...noticeJobs];
                                 displayData = Array.from(new Map(displayData.map(item => [item.id, item])).values());
                                 displayData.sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
+                            } else if (activeTab === '용차출동') {
+                                displayData = equipment;
+                                if (regionSearch.trim()) {
+                                    const kw = regionSearch.trim().toLowerCase();
+                                    displayData = [...equipment]
+                                        .filter(item => matchesRegionAndCategorySearch(item, kw))
+                                        .sort((a, b) => {
+                                            const aAddr = ((a as any).address || (a as any).deliverAddress || '').toLowerCase();
+                                            const bAddr = ((b as any).address || (b as any).deliverAddress || '').toLowerCase();
+                                            const aMatch = aAddr.includes(kw);
+                                            const bMatch = bAddr.includes(kw);
+                                            if (aMatch && !bMatch) return -1;
+                                            if (!aMatch && bMatch) return 1;
+                                            return 0;
+                                        });
+                                }
                             } else {
                                 displayData = notices.filter(notice => notice.categoryName === activeTab);
                             }
@@ -397,6 +574,13 @@ export default function NoticeBoard() {
                             return displayData.map((notice) => {
                                 const isExpanded = expandedNoticeIds.has(notice.id);
                                 const isHiring = activeTab === '택배구인';
+                                const isEquipment = activeTab === '용차출동';
+
+                                // Type guards or safe access for different item types
+                                const equipmentName = (notice as any).equipment_name;
+                                const equipmentCareer = (notice as any).equipment_career;
+                                const equipmentAddress = (notice as any).address || (notice as any).deliverAddress;
+
                                 const selectedJobNamesText = Array.isArray((notice as any).selectedJobNames)
                                     ? ((notice as any).selectedJobNames as any[])
                                         .map((v) => (v ?? '').toString().trim())
@@ -406,14 +590,24 @@ export default function NoticeBoard() {
                                 const addressText = ((notice as any).deliverAddress ?? (notice as any).address ?? '')
                                     .toString()
                                     .trim();
-                                const fallbackTitle = [selectedJobNamesText, addressText].filter(Boolean).join(' · ');
+
+                                const fallbackTitle = isEquipment
+                                    ? [equipmentName, equipmentAddress].filter(Boolean).join(' · ')
+                                    : [selectedJobNamesText, addressText].filter(Boolean).join(' · ');
+
+                                let displayTitle = notice.title;
+                                if (isEquipment) {
+                                    displayTitle = equipmentName || fallbackTitle;
+                                } else if (!displayTitle) {
+                                    displayTitle = fallbackTitle;
+                                }
 
                                 return (
                                     <div
                                         key={notice.id}
-                                        className={`p-5 rounded-2xl bg-white border border-gray-100 shadow-sm transition-all overflow-hidden ${isHiring ? 'cursor-pointer hover:border-blue-200' : 'cursor-default border-gray-100 hover:border-gray-100'}`}
+                                        className={`p-5 rounded-2xl bg-white border border-gray-100 shadow-sm transition-all overflow-hidden ${(isHiring || isEquipment) ? 'cursor-pointer hover:border-blue-200' : 'cursor-default border-gray-100 hover:border-gray-100'}`}
                                         onClick={() => {
-                                            if (!isHiring) return;
+                                            if (!isHiring && !isEquipment) return;
                                             if (noticeScrollRef.current != null) {
                                                 sessionStorage.setItem(NOTICE_SCROLL_KEY, String(noticeScrollRef.current.scrollTop));
                                             }
@@ -424,21 +618,28 @@ export default function NoticeBoard() {
                                                 searchQuery,
                                                 activeTab,
                                             }));
-                                            router.push(`/pro-apply/${notice.id}`);
+
+                                            if (isEquipment) {
+                                                router.push(`/equipment/${notice.id}`);
+                                            } else {
+                                                router.push(`/pro-apply/${notice.id}`);
+                                            }
                                         }}
                                     >
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex-1 mr-3">
                                                 <div className="flex items-center gap-2 mb-1.5">
                                                     <span className={`flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${activeTab === '택배구인' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-500'}`}>
-                                                        {notice.categoryName || (activeTab === '택배구인' ? '택배일자리' : activeTab)}
-                                                        {(notice.imageUrls || notice.images || notice.imageDownloadUrls)?.length > 0 && (
+                                                        {notice.categoryName || (activeTab === '택배구인' ? '택배일자리' : (activeTab === '용차출동' ? '용차출동' : activeTab))}
+                                                        {((notice as any).imageDownloadUrls || notice.imageUrls || notice.images)?.length > 0 && (
                                                             <Camera className="w-3 h-3" />
                                                         )}
                                                     </span>
-                                                    {notice.SubCategories && (
+                                                    {(notice.SubCategories || (notice as any).SubCategories) && (
                                                         <span className="text-[11px] font-black text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md">
-                                                            {notice.SubCategories}
+                                                            {Array.isArray(notice.SubCategories || (notice as any).SubCategories)
+                                                                ? (notice.SubCategories || (notice as any).SubCategories).join(', ')
+                                                                : (notice.SubCategories || (notice as any).SubCategories)}
                                                         </span>
                                                     )}
                                                     {notice.author && !notice.company && (
@@ -449,7 +650,7 @@ export default function NoticeBoard() {
                                                 </div>
                                                 <h4 className="font-black text-gray-900 text-lg leading-tight tracking-tight">
                                                     {(() => {
-                                                        const full = notice.title || fallbackTitle;
+                                                        const full = displayTitle || '';
                                                         return full.length > 35 ? `${full.slice(0, 35)}…` : full;
                                                     })()}
                                                 </h4>
@@ -462,33 +663,41 @@ export default function NoticeBoard() {
                                             </span>
                                         </div>
 
-                                        {isHiring && (
+                                        {(isHiring || isEquipment) && (
                                             <div className="flex flex-wrap gap-2 mb-4">
-                                                {notice.monthlyIncome && (
+                                                {/* Hiring specific fields */}
+                                                {isHiring && notice.monthlyIncome && (
                                                     <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 text-green-700 rounded-xl border border-green-100 shadow-sm">
                                                         <CreditCard className="w-3.5 h-3.5" />
                                                         <span className="text-[11px] font-black">수익: {notice.monthlyIncome}</span>
                                                     </div>
                                                 )}
-                                                {notice.totalVolume && (
+                                                {/* Equipment specific fields */}
+                                                {isEquipment && (notice as any).equipment_rentalRates && (
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 text-green-700 rounded-xl border border-green-100 shadow-sm">
+                                                        <CreditCard className="w-3.5 h-3.5" />
+                                                        <span className="text-[11px] font-black">비용: {(notice as any).equipment_rentalRates}</span>
+                                                    </div>
+                                                )}
+                                                {isHiring && notice.totalVolume && (
                                                     <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-100 shadow-sm">
                                                         <Box className="w-3.5 h-3.5" />
                                                         <span className="text-[11px] font-black">수량: {notice.totalVolume}</span>
                                                     </div>
                                                 )}
-                                                {notice.license && (
+                                                {(notice.license || (notice as any).equipment_businessLicense) && (
                                                     <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-50 text-orange-700 rounded-xl border border-orange-100 shadow-sm">
                                                         <Award className="w-3.5 h-3.5" />
-                                                        <span className="text-[11px] font-black">자격: {notice.license}</span>
+                                                        <span className="text-[11px] font-black">{isEquipment ? '경력: ' : '자격: '}{notice.license || (notice as any).equipment_businessLicense}</span>
                                                     </div>
                                                 )}
-                                                {notice.deliverAddress && (
+                                                {(notice.deliverAddress || (notice as any).address) && (
                                                     <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 text-gray-700 rounded-xl border border-gray-200">
                                                         <MapPin className="w-3.5 h-3.5" />
-                                                        <span className="text-[11px] font-black">{notice.deliverAddress}</span>
+                                                        <span className="text-[11px] font-black">{notice.deliverAddress || (notice as any).address}</span>
                                                     </div>
                                                 )}
-                                                {notice.ratio && (
+                                                {isHiring && notice.ratio && (
                                                     <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 text-purple-700 rounded-xl border border-purple-100">
                                                         <PieChart className="w-3.5 h-3.5" />
                                                         <span className="text-[11px] font-black">{notice.ratio}</span>
@@ -497,10 +706,10 @@ export default function NoticeBoard() {
                                             </div>
                                         )}
 
-                                        {/* Notice Images - Show only for Gongji (Notice) tab */}
-                                        {activeTab === '공지사항' && (notice.imageUrls || notice.images || notice.imageDownloadUrls) && (
+                                        {/* Notice Images - Show for Gongji (Notice) tab only */}
+                                        {activeTab === '공지사항' && ((notice as any).imageDownloadUrls || notice.imageUrls || notice.images) && (
                                             <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar py-1">
-                                                {(notice.imageUrls || notice.images || notice.imageDownloadUrls).map((url: string, idx: number) => (
+                                                {((notice as any).imageDownloadUrls || notice.imageUrls || notice.images).map((url: string, idx: number) => (
                                                     <div
                                                         key={idx}
                                                         className="w-24 h-24 rounded-xl overflow-hidden shrink-0 border border-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
@@ -518,33 +727,58 @@ export default function NoticeBoard() {
 
                                         <div className="relative">
                                             <p className={`text-gray-600 text-[15px] whitespace-pre-wrap leading-relaxed ${!isExpanded ? 'line-clamp-3' : ''}`}>
-                                                {notice.content}
+                                                {notice.content || (notice as any).equipment_career}
                                             </p>
-                                            {!isExpanded && notice.content && (notice.content.split('\n').length > 3 || notice.content.length > 100) && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        toggleExpand(notice.id, e);
-                                                    }}
-                                                    className="mt-3 text-blue-500 text-sm font-bold hover:underline"
-                                                >
-                                                    ... 더보기
-                                                </button>
-                                            )}
-                                            {isExpanded && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        toggleExpand(notice.id, e);
-                                                    }}
-                                                    className="mt-3 text-gray-400 text-sm font-bold hover:underline"
-                                                >
-                                                    접기
-                                                </button>
-                                            )}
                                         </div>
 
-                                        {/* SMS and redundant links removed from list as requested */}
+                                        {isEquipment && (
+                                            <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        window.location.href = `tel:${(notice as any).equipment_phoneNumber}`;
+                                                    }}
+                                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-sm font-black hover:bg-blue-100 transition-colors"
+                                                >
+                                                    <Phone className="w-4 h-4" />
+                                                    전화문의
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        window.location.href = `sms:${(notice as any).equipment_phoneNumber}?body=${encodeURIComponent('안녕하세요. 용카에서 보고 연락드립니다.')}`;
+                                                    }}
+                                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-50 text-green-600 rounded-xl text-sm font-black hover:bg-green-100 transition-colors"
+                                                >
+                                                    <MessageSquare className="w-4 h-4" />
+                                                    문자문의
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {!isExpanded && (notice.content || (notice as any).equipment_career) && ((notice.content || (notice as any).equipment_career).split('\n').length > 3 || (notice.content || (notice as any).equipment_career).length > 100) && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleExpand(notice.id, e);
+                                                }}
+                                                className="mt-3 text-blue-500 text-sm font-bold hover:underline"
+                                            >
+                                                ... 더보기
+                                            </button>
+                                        )}
+                                        {isExpanded && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleExpand(notice.id, e);
+                                                }}
+                                                className="mt-3 text-gray-400 text-sm font-bold hover:underline"
+                                            >
+                                                접기
+                                            </button>
+                                        )}
+
                                         {notice.link && (
                                             <a
                                                 href={notice.link}
@@ -576,65 +810,87 @@ export default function NoticeBoard() {
                         })()}
                         <div className="h-10"></div>
                     </div>
-
                 </div>
-            )}
+            )
+            }
 
             {/* 용카앱 설치 버튼: body에 포털로 렌더링해 스크롤과 무관하게 화면 하단 고정 */}
-            {typeof document !== 'undefined' && isNoticeOpen && activeTab === '공지사항' && ReactDOM.createPortal(
-                <div className="fixed bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
-                    <a
-                        href="http://pf.kakao.com/_XxixizX"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-8 py-4 bg-[#FEE500] text-[#3C1E1E] rounded-full font-black text-[15px] shadow-2xl hover:bg-[#F5DC00] transition-all transform hover:scale-105 active:scale-95 pointer-events-auto"
-                    >
-                        <MessageSquare className="w-5 h-5" />
-                        용카채팅문의
-                    </a>
-                </div>,
-                document.body
-            )}
+            {
+                typeof document !== 'undefined' && isNoticeOpen && activeTab === '공지사항' && ReactDOM.createPortal(
+                    <div className="fixed bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
+                        <a
+                            href="http://pf.kakao.com/_XxixizX"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-8 py-4 bg-[#FEE500] text-[#3C1E1E] rounded-full font-black text-[15px] shadow-2xl hover:bg-[#F5DC00] transition-all transform hover:scale-105 active:scale-95 pointer-events-auto"
+                        >
+                            <MessageSquare className="w-5 h-5" />
+                            용카채팅문의
+                        </a>
+                    </div>,
+                    document.body
+                )
+            }
 
-            {typeof document !== 'undefined' && isNoticeOpen && activeTab === '택배구인' && ReactDOM.createPortal(
-                <div className="fixed bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
-                    <button
-                        onClick={() => setShowAppInstall(true)}
-                        className="flex items-center gap-2 px-8 py-4 bg-[#4CAF50] text-white rounded-full font-black text-[15px] shadow-2xl hover:bg-[#45a049] transition-all transform hover:scale-105 active:scale-95 pointer-events-auto"
-                    >
-                        <Smartphone className="w-5 h-5" />
-                        용카앱 설치
-                    </button>
-                </div>,
-                document.body
-            )}
+            {
+                typeof document !== 'undefined' && isNoticeOpen && activeTab === '택배구인' && ReactDOM.createPortal(
+                    <div className="fixed bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
+                        <button
+                            onClick={() => setShowAppInstall(true)}
+                            className="flex items-center gap-2 px-8 py-4 bg-[#4CAF50] text-white rounded-full font-black text-[15px] shadow-2xl hover:bg-[#45a049] transition-all transform hover:scale-105 active:scale-95 pointer-events-auto"
+                        >
+                            <Smartphone className="w-5 h-5" />
+                            용카앱 설치
+                        </button>
+                    </div>,
+                    document.body
+                )
+            }
+
+            {
+                typeof document !== 'undefined' && isNoticeOpen && activeTab === '용차출동' && ReactDOM.createPortal(
+                    <div className="fixed bottom-10 left-0 right-0 flex justify-center z-[130] pointer-events-none">
+                        <button
+                            onClick={() => setShowDispatchDialog(true)}
+                            className="flex items-center gap-2 px-8 py-4 bg-blue-500 text-white rounded-full font-black text-[15px] shadow-2xl hover:bg-orange-600 transition-all transform hover:scale-105 active:scale-95 pointer-events-auto"
+                        >
+                            <Truck className="w-5 h-5" />
+                            용차 호출
+                        </button>
+                    </div>,
+                    document.body
+                )
+            }
 
             <AppInstallDialog isOpen={showAppInstall} onClose={() => setShowAppInstall(false)} />
+            <DispatchInfoDialog isOpen={showDispatchDialog} onClose={() => setShowDispatchDialog(false)} />
 
-            {selectedImage && (
-                <div
-                    className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-                    onClick={() => setSelectedImage(null)}
-                >
+            {
+                selectedImage && (
                     <div
-                        className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
+                        className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+                        onClick={() => setSelectedImage(null)}
                     >
-                        <button
-                            onClick={() => setSelectedImage(null)}
-                            className="absolute top-4 right-4 z-10 p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors"
+                        <div
+                            className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <X className="w-6 h-6 text-white" />
-                        </button>
-                        <img
-                            src={selectedImage}
-                            alt="확대된 이미지"
-                            className="w-full h-full object-contain"
-                            style={{ maxWidth: '90vw', maxHeight: '90vh' }}
-                        />
+                            <button
+                                onClick={() => setSelectedImage(null)}
+                                className="absolute top-4 right-4 z-10 p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors"
+                            >
+                                <X className="w-6 h-6 text-white" />
+                            </button>
+                            <img
+                                src={selectedImage}
+                                alt="확대된 이미지"
+                                className="w-full h-full object-contain"
+                                style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
             <AISearchResultModal
                 isOpen={showAiModal}
                 onClose={() => {
@@ -840,6 +1096,59 @@ function AISearchResultModal({ isOpen, onClose, isSearching, result, totalCount 
                             결과를 불러오지 못했습니다. 다시 시도해주세요.
                         </div>
                     )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DispatchInfoDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6" onClick={onClose}>
+            <div className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden animate-in fade-in zoom-in duration-300 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-8 text-center text-white relative">
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <X className="w-6 h-6" />
+                    </button>
+                    <div className="bg-white/20 w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
+                        <Truck className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-xl font-black mb-2 leading-tight">용카 호출은<br />현재 앱에서만 지원합니다</h3>
+                    <p className="text-orange-100 text-xs font-bold">카톡으로 보내는 호출 기능을
+                        만나보세요</p>
+                </div>
+                <div className="p-6 space-y-3">
+                    <a href="https://play.google.com/store/apps/details?id=com.yongcar.app&pcampaignid=web_share" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 w-full p-4 bg-[#F5F7FA] hover:bg-[#E4E9F0] rounded-2xl transition-all active:scale-[0.98] group">
+                        <div className="bg-[#34A853] p-2 rounded-lg text-white">
+                            <Play className="w-5 h-5 fill-current" />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="text-[10px] text-gray-500 font-bold leading-none mb-1">Android</p>
+                            <p className="text-sm font-black text-gray-900 leading-none">Google Play</p>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                    </a>
+                    <a href="https://apps.apple.com/kr/app/%EC%9A%A9%EC%B9%B4/id6758199533" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 w-full p-4 bg-[#F5F7FA] hover:bg-[#E4E9F0] rounded-2xl transition-all active:scale-[0.98] group">
+                        <div className="bg-[#000000] p-2 rounded-lg text-white">
+                            <Apple className="w-5 h-5 fill-current" />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="text-[10px] text-gray-500 font-bold leading-none mb-1">iOS</p>
+                            <p className="text-sm font-black text-gray-900 leading-none">App Store</p>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                    </a>
+                    <a href="https://yongcar.com/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 w-full p-4 bg-blue-50 hover:bg-blue-100 rounded-2xl transition-all active:scale-[0.98] group">
+                        <div className="bg-blue-600 p-2 rounded-lg text-white">
+                            <Globe className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="text-[10px] text-blue-400 font-bold leading-none mb-1">Official</p>
+                            <p className="text-sm font-black text-blue-900 leading-none">용카 웹사이트</p>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-blue-200 group-hover:text-blue-500 transition-colors" />
+                    </a>
                 </div>
             </div>
         </div>

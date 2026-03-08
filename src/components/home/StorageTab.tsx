@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ImageIcon, Loader2, FileText, ExternalLink, Trash2, FileCode, X, Copy, DownloadCloud } from 'lucide-react';
 import { useUserStorage } from '@/hooks/useUserStorage';
 import { StorageItem } from '@/types/home';
@@ -76,7 +77,7 @@ export default function StorageTab() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <h3 className="text-xl font-bold flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-blue-500" />
-                    저장 파일 및 메모
+                    저장파일 및 메모
                 </h3>
                 <div className="flex gap-2">
                     <label className="flex items-center gap-2 bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl border border-blue-100 cursor-pointer hover:bg-blue-100 transition-all font-bold text-sm">
@@ -181,13 +182,13 @@ export default function StorageTab() {
             </div>
 
             {/* Detail Modal */}
-            {selectedItem && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {selectedItem && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
                     <div
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
                         onClick={() => setSelectedItem(null)}
                     ></div>
-                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="relative bg-white rounded-t-[32px] sm:rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-top-4 sm:zoom-in duration-300">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                             <div className="flex items-center gap-2">
@@ -209,7 +210,7 @@ export default function StorageTab() {
                         </div>
 
                         {/* Modal Content */}
-                        <div className="p-6 max-h-[70vh] overflow-y-auto">
+                        <div className="p-6 max-h-[75vh] sm:max-h-[70vh] overflow-y-auto no-scrollbar">
                             {selectedItem.type === 'image' ? (
                                 <div className="flex flex-col items-center gap-4 text-center">
                                     <img
@@ -275,7 +276,8 @@ export default function StorageTab() {
                             </span>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
