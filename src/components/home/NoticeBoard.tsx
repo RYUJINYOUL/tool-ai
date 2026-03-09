@@ -997,26 +997,23 @@ function AISearchBar({ onSearch, isSearching, initialValue }: { onSearch: (q: st
 
     return (
         <form onSubmit={handleSubmit} className="relative flex items-center">
-            <div className="absolute left-4 text-blue-500">
+            <div className="absolute left-4 text-gray-400">
                 <Sparkles className="w-5 h-5" />
             </div>
             <input
                 type="text"
-                placeholder="AI검색 : 일산 500만원 수익 택배 일자리"
+                placeholder="3월 12일까지 AI검색 점검 중입니다"
                 value={localQuery}
                 onChange={(e) => setLocalQuery(e.target.value)}
-                className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl text-[15px] outline-none focus:border-blue-400 focus:bg-white transition-all shadow-inner"
+                disabled={true}
+                className="w-full pl-12 pr-12 py-3.5 bg-gray-100 border border-gray-200 rounded-2xl text-[15px] outline-none cursor-not-allowed opacity-70"
             />
             <button
                 type="submit"
-                disabled={isSearching || !localQuery.trim()}
-                className="absolute right-3 p-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:bg-gray-200 transition-colors shadow-sm"
+                disabled={true}
+                className="absolute right-3 p-2 bg-gray-200 text-gray-400 rounded-xl cursor-not-allowed transition-colors"
             >
-                {isSearching ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                    <Search className="w-5 h-5" />
-                )}
+                <Search className="w-5 h-5" />
             </button>
         </form>
     );

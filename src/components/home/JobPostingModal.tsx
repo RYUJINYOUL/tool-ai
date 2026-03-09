@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Sparkles, Loader2, Save, Truck, MapPin, Clock, Phone, Briefcase, CreditCard, Box, Calendar, PieChart, Camera, Plus, Trash2, Image as ImageIcon, FileText, ChevronRight } from 'lucide-react';
+import { X, Sparkles, Loader2, Save, Truck, MapPin, Clock, Phone, Briefcase, CreditCard, Box, Calendar, PieChart, Camera, Plus, Trash2, Image as ImageIcon, FileText, ChevronRight, Check } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, GeoPoint } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -186,36 +186,40 @@ export default function JobPostingModal({ isOpen, onClose }: JobPostingModalProp
         setFormData(newData);
     };
 
-    const handleAiFill = async (textToAnalyze?: string) => {
-        const text = textToAnalyze || aiInput;
+    const handleAiFill = async () => {
+        const text = aiInput;
         if (!text.trim()) {
-            alert('정리할 공고 내용을 입력해주세요.');
+            alert('정리할 내용을 입력해주세요.');
             return;
         }
 
         setIsAiLoading(true);
-        try {
-            const response = await fetch('/api/ai/recruit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text }),
-            });
 
-            if (!response.ok) throw new Error('AI analysis failed');
-
-            const data = await response.json();
+        // 로컬 파싱 로직 (AI 없이 텍스트에서 정보 추출)
+        setTimeout(() => {
+            const extracted = {
+                agency: text.match(/대리점[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                courier: text.match(/택배사[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                delivery_address: text.match(/(?:배송지|주소)[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                terminal_address: text.match(/터미널[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                income: text.match(/(?:수익|매출|급여)[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                working_hours: text.match(/시간[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                contact: text.match(/(?:연락처|번호)[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                description: text.replace(/\[구인등록 완료\].*|대리점:.*|연락처:.*|등록일:.*|링크:.*/g, '').trim(),
+                license: text.includes('자격증'),
+                sorting_helper: text.includes('분류')
+            };
 
             setFormData(prev => {
-                const courierText = data.courier || data.agency || '';
+                const courierText = extracted.courier || extracted.agency || '';
                 const newCategory = (() => {
                     const mapped = categorizeFromCourier(courierText);
                     if (mapped === '쿠팡주간' && prev.jobField === '야간') return '쿠팡야간';
                     return mapped || '';
                 })();
 
-                const newDeliverAddress = data.delivery_address || prev.deliverAddress;
+                const newDeliverAddress = extracted.delivery_address || prev.deliverAddress;
 
-                // Use custom category (직접입력) with the AI-detected value
                 if (newCategory && !categories.includes(newCategory)) {
                     setIsCustomCategory(true);
                 } else {
@@ -225,53 +229,23 @@ export default function JobPostingModal({ isOpen, onClose }: JobPostingModalProp
                 return {
                     ...prev,
                     title: newDeliverAddress ? `[${newCategory || prev.category}] ${newDeliverAddress}` : prev.title,
-                    company: data.agency || data.courier || prev.company,
+                    company: extracted.agency || extracted.courier || prev.company,
                     deliverAddress: newDeliverAddress,
-                    terminalAddress: data.terminal_address || prev.terminalAddress,
-                    monthlyIncome: data.income || prev.monthlyIncome,
-                    workTime: data.working_hours || prev.workTime,
-                    phoneNumber: data.contact || prev.phoneNumber,
-                    description: data.description || prev.description,
-                    license: data.license?.includes('필요') ? '필요' : '불필요',
-                    hasClassificationHelper: data.sorting_helper?.includes('있음') || false,
-                    classificationHelperStatus: data.sorting_helper?.includes('있음') ? '있음' : '업체문의',
+                    terminalAddress: extracted.terminal_address || prev.terminalAddress,
+                    monthlyIncome: extracted.income || prev.monthlyIncome,
+                    workTime: extracted.working_hours || prev.workTime,
+                    phoneNumber: extracted.contact || prev.phoneNumber,
+                    description: extracted.description || prev.description,
+                    license: extracted.license ? '필요' : '불필요',
+                    hasClassificationHelper: extracted.sorting_helper,
+                    classificationHelperStatus: extracted.sorting_helper ? '있음' : '업체문의',
                     category: newCategory || prev.category
                 };
             });
 
-            if (!textToAnalyze) setAiInput('');
-
-            // Geocode the delivery address and set geoPreview (display only)
-            const finalAddress = data.delivery_address || formData.deliverAddress;
-            if (finalAddress) {
-                try {
-                    const geoRes = await fetch('/api/geocode', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ address: finalAddress })
-                    });
-                    if (geoRes.ok) {
-                        const { lat, lng } = await geoRes.json();
-                        if (lat && lng) {
-                            setGeoPreview({
-                                geohash: encodeGeohash(lat, lng),
-                                lat,
-                                lng
-                            });
-                        }
-                    }
-                } catch (geoErr) {
-                    console.warn('Geocoding preview failed:', geoErr);
-                }
-            }
-
-            alert('AI가 공고 내용을 분석하여 폼을 채웠습니다.');
-        } catch (error) {
-            console.error(error);
-            alert('AI 분석 중 오류가 발생했습니다.');
-        } finally {
             setIsAiLoading(false);
-        }
+            alert('내용을 확인하여 폼을 채웠습니다.');
+        }, 800);
     };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -318,8 +292,6 @@ export default function JobPostingModal({ isOpen, onClose }: JobPostingModalProp
         } else {
             setAiInput(item.content);
             setIsStoragePickerOpen(false);
-            // Auto trigger AI analysis for text import
-            await handleAiFill(item.content);
         }
     };
 
@@ -486,8 +458,8 @@ export default function JobPostingModal({ isOpen, onClose }: JobPostingModalProp
                                 disabled={isAiLoading || !aiInput.trim()}
                                 className="absolute bottom-3 right-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-95"
                             >
-                                {isAiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                AI 정리 및 채우기
+                                {isAiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                확인
                             </button>
                         </div>
                     </div>

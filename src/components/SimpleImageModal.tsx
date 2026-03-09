@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { X, Image as ImageIcon, Download, Type, Check, Loader2, Sparkles, ZoomIn, ZoomOut, Save } from 'lucide-react';
+import { X, Image as ImageIcon, Download, Type, Check, Loader2, Sparkles, ZoomIn, ZoomOut, Save, FileText, Plus } from 'lucide-react';
 import { domToPng } from 'modern-screenshot';
 import { useUserStorage } from '@/hooks/useUserStorage';
 import { useAuth } from '@/context/auth-context';
@@ -108,43 +108,58 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
     const [inputText, setInputText] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
-    const [recruitData, setRecruitData] = useState<RecruitData | null>(null);
     const [isSavingToStorage, setIsSavingToStorage] = useState(false);
     const [zoomLevel, setZoomLevel] = useState(70);
+    const [recruitData, setRecruitData] = useState<RecruitData | null>(null);
+    const [isStoragePickerOpen, setIsStoragePickerOpen] = useState(false);
     const previewRef = useRef<HTMLDivElement>(null);
-    const { uploadImage } = useUserStorage();
+    const { uploadImage, storageItems } = useUserStorage();
     const { isLoggedIn } = useAuth();
 
     const activeBrand = BRANDS[selectedBrand];
 
     const handleAIAnalyze = async () => {
-        if (!inputText.trim()) {
-            alert('분석할 공고 내용을 입력해주세요.');
+        const text = inputText;
+        if (!text.trim()) {
+            alert('내용을 입력해주세요.');
             return;
         }
         setIsAnalyzing(true);
-        try {
-            const response = await fetch('/api/ai/recruit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: inputText }),
-            });
-            if (!response.ok) throw new Error('AI analysis failed');
-            const data = await response.json();
-            setRecruitData(data);
-            const courier = data.courier || '';
+
+        // 로컬 파싱 로직 (AI 없이 텍스트에서 정보 추출)
+        setTimeout(() => {
+            const parsedData: RecruitData = {
+                courier: text.match(/택배사[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                delivery_address: text.match(/(?:배송지|주소)[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                terminal_address: text.match(/터미널[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                delivery_ratio: text.match(/비율[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                income: text.match(/(?:수익|매출|급여)[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                sorting_helper: text.match(/분류[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                working_hours: text.match(/시간[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                agency: text.match(/대리점[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                license: text.match(/자격증[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                deadline: text.match(/마감[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                contact: text.match(/(?:연락처|번호)[:\s]*([^\n]+)/)?.[1]?.trim() || '',
+                description: text.replace(/\[구인등록 완료\].*|대리점:.*|연락처:.*|등록일:.*|링크:.*/g, '').trim()
+            };
+
+            setRecruitData(parsedData);
+
+            const courier = parsedData.courier || '';
             if (courier.includes('CJ') || courier.includes('대한통운')) setSelectedBrand('cj');
             else if (courier.includes('쿠팡')) setSelectedBrand('coupang');
             else if (courier.includes('로젠')) setSelectedBrand('logen');
             else if (courier.includes('롯데')) setSelectedBrand('lotte');
             else if (courier.includes('한진')) setSelectedBrand('hanjin');
             else setSelectedBrand('etc');
-        } catch (error) {
-            console.error(error);
-            alert('AI 분석 중 오류가 발생했습니다.');
-        } finally {
-            setTimeout(() => setIsAnalyzing(false), 1000);
-        }
+
+            setIsAnalyzing(false);
+        }, 800);
+    };
+
+    const importFromStorage = async (item: any) => {
+        setInputText(item.content);
+        setIsStoragePickerOpen(false);
     };
 
     // ✅ Fix: scrollWidth/scrollHeight 명시로 저장 시 잘림 방지
@@ -223,14 +238,22 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
                         <div className="space-y-4">
                             <label className="text-sm font-bold text-gray-400 flex items-center justify-between">
                                 <div className="flex items-center gap-2"><Type className="w-4 h-4" /> 공고 내용 입력</div>
-                                <button
-                                    onClick={handleAIAnalyze}
-                                    disabled={isAnalyzing || !inputText.trim()}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors disabled:opacity-50"
-                                >
-                                    {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                    AI 분석
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setIsStoragePickerOpen(true)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 rounded-full text-xs font-bold hover:bg-green-100 transition-colors"
+                                    >
+                                        <Plus className="w-3 h-3" /> 저장파일에서 가져오기
+                                    </button>
+                                    <button
+                                        onClick={() => handleAIAnalyze()}
+                                        disabled={isAnalyzing || !inputText.trim()}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors disabled:opacity-50"
+                                    >
+                                        {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                        확인
+                                    </button>
+                                </div>
                             </label>
                             <textarea
                                 className="w-full h-40 p-5 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all resize-none text-gray-700 font-medium"
@@ -564,6 +587,56 @@ export default function SimpleImageModal({ isOpen, onClose }: SimpleImageModalPr
                         </div>
                     </div>
                 </div>
+
+                {/* Storage Content Picker Overlay */}
+                {isStoragePickerOpen && (
+                    <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end">
+                        <div className="w-full bg-white rounded-t-[40px] shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[70%]">
+                            <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+                                <h4 className="font-black text-gray-900 text-xl flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-blue-600" />
+                                    저장파일에서 불러오기
+                                </h4>
+                                <button onClick={() => setIsStoragePickerOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                                    <X className="w-6 h-6 text-gray-400" />
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
+                                <div className="grid grid-cols-1 gap-2">
+                                    {storageItems.filter(item => item.type !== 'image' && !item.content?.startsWith('[구인등록 완료]')).length === 0 ? (
+                                        <div className="py-20 text-center text-gray-400 font-bold">
+                                            저장된 텍스트가 없습니다.
+                                        </div>
+                                    ) : (
+                                        storageItems
+                                            .filter(item => item.type !== 'image' && !item.content?.startsWith('[구인등록 완료]'))
+                                            .map((item) => (
+                                                <button
+                                                    key={item.id}
+                                                    onClick={() => importFromStorage(item)}
+                                                    className="w-full text-left p-4 hover:bg-blue-50 rounded-2xl border border-gray-100 hover:border-blue-200 transition-all group"
+                                                >
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
+                                                            <FileText className="w-5 h-5 text-gray-400 group-hover:text-blue-500" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm text-gray-600 font-medium line-clamp-2 leading-relaxed">
+                                                                {item.content}
+                                                            </p>
+                                                            <p className="text-[10px] text-gray-400 mt-2 font-bold uppercase tracking-wider">
+                                                                {item.createdAt?.toDate?.()?.toLocaleDateString() || new Date().toLocaleDateString()}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
