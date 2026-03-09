@@ -290,7 +290,7 @@ export default function LoginPage() {
 
                                 <div className="bg-blue-50 p-6 rounded-2xl mb-8 border border-blue-100">
                                     <div className="text-blue-600 font-bold text-lg text-center leading-relaxed">
-                                        회원가입은 용카앱 · 용카웹 지원
+                                        회원가입은 아래 링크에서 가입하세요<br /> exe파일은 기사회원만 지원합니다
                                     </div>
                                 </div>
 
@@ -305,8 +305,8 @@ export default function LoginPage() {
                                             <img src="/google_logo.png" className="w-8 h-8 object-contain" alt="Play Store" />
                                         </div>
                                         <div className="flex flex-col items-start">
-                                            <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">GET IT ON</span>
-                                            <span className="text-gray-900 text-lg font-extrabold">Google Play</span>
+                                            <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Download</span>
+                                            <span className="text-gray-900 text-lg font-extrabold">용카앱 구글</span>
                                         </div>
                                     </a>
 
@@ -320,8 +320,8 @@ export default function LoginPage() {
                                             <img src="/apple.png" className="w-8 h-8 object-contain" alt="App Store" />
                                         </div>
                                         <div className="flex flex-col items-start">
-                                            <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Download on the</span>
-                                            <span className="text-gray-900 text-lg font-extrabold">App Store</span>
+                                            <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">Download</span>
+                                            <span className="text-gray-900 text-lg font-extrabold">용카앱 애플</span>
                                         </div>
                                     </a>
 
