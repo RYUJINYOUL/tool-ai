@@ -57,9 +57,9 @@ export default function NoticeBoard() {
     const [activeTab, setActiveTab] = useState('택배구인');
     const [showAppInstall, setShowAppInstall] = useState(false);
     const [showDispatchDialog, setShowDispatchDialog] = useState(false);
-    const { notices, isNoticesLoading } = useNotices();
-    const { posts: proApplyPosts, loading: isProApplyLoading } = useProApply();
-    const { equipment, loading: isEquipmentLoading } = useEquipment();
+    const { notices, isNoticesLoading } = useNotices(isNoticeOpen);
+    const { posts: proApplyPosts, loading: isProApplyLoading } = useProApply(isNoticeOpen);
+    const { equipment, loading: isEquipmentLoading } = useEquipment(isNoticeOpen);
     const { firebaseUser, isLoggedIn } = useAuth();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -93,8 +93,10 @@ export default function NoticeBoard() {
     const [totalEquipCount, setTotalEquipCount] = useState(0);
     const noticeScrollRef = useRef<HTMLDivElement | null>(null);
 
-    /** Fetch Total Counts for UI Header */
+    /** Fetch Total Counts for UI Header (Lazy Load when open) */
     useEffect(() => {
+        if (!isNoticeOpen) return;
+
         const fetchCounts = async () => {
             try {
                 // Efficiently get counts without loading all documents
@@ -107,7 +109,7 @@ export default function NoticeBoard() {
             }
         };
         fetchCounts();
-    }, []);
+    }, [isNoticeOpen]);
 
     const NOTICE_SCROLL_KEY = 'noticeBoardScrollTop';
     const NOTICE_STATE_KEY = 'noticeBoardRestoreState';

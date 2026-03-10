@@ -27,17 +27,19 @@ export interface Equipment {
     createdAt?: Date; // Normalized field
 }
 
-export function useEquipment() {
+export function useEquipment(enabled = true) {
     const [equipment, setEquipment] = useState<Equipment[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(enabled);
 
     useEffect(() => {
+        if (!enabled) return;
+
         setLoading(true);
-        // Optimize: Limit to recent 50 equipment entries to reduce Firestore costs
+        // Optimize: Limit to recent equipment entries to reduce Firestore costs
         const q = query(
             collection(db, 'equipment'),
             orderBy('createdDate', 'desc'),
-            limit(50)
+            limit(300)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -68,7 +70,7 @@ export function useEquipment() {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [enabled]);
 
     return { equipment, loading };
 }

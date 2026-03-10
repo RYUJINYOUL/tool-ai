@@ -5,17 +5,19 @@ import { db } from '@/lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Notice } from '@/types/home';
 
-export function useNotices() {
+export function useNotices(enabled = true) {
     const [notices, setNotices] = useState<Notice[]>([]);
-    const [isNoticesLoading, setIsNoticesLoading] = useState(true);
+    const [isNoticesLoading, setIsNoticesLoading] = useState(enabled);
 
     useEffect(() => {
+        if (!enabled) return;
+
         setIsNoticesLoading(true);
-        // Optimize: Limit to recent 100 community posts to reduce Firestore read costs
+        // Optimize: Limit to recent 300 community posts to reduce Firestore read costs
         const q = query(
             collection(db, 'community'),
             orderBy('createdAt', 'desc'),
-            limit(100)
+            limit(300)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -51,7 +53,7 @@ export function useNotices() {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [enabled]);
 
     return { notices, isNoticesLoading };
 }

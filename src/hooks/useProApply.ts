@@ -28,24 +28,25 @@ export interface ProApplyPost {
     phoneNumber?: string;
 }
 
-export function useProApply() {
+export function useProApply(enabled = true) {
     const [posts, setPosts] = useState<ProApplyPost[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(enabled);
 
     useEffect(() => {
+        if (!enabled) return;
+
         setLoading(true);
-        // Optimize: Limit to recent 50 posts to reduce Firestore read costs
-        // Note: Using 'createdDate' because it's the primary field in our python-uploaded data
+        // Optimize: Limit to recent 300 posts to improve search results while controlling costs
         const q = query(
             collection(db, 'proApply'),
             orderBy('createdDate', 'desc'),
-            limit(50)
+            limit(300)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedPosts = snapshot.docs.map(doc => {
                 const data = doc.data();
-                // Normalize date: Check multiple fields to ensure we get a valid creation date
+                // Normalize date: Check multiple fields
                 const rawDate = data.createdDate || data.pushTime || data.uploadedAt || data.createdAt;
                 const createdAt = rawDate instanceof Timestamp
                     ? rawDate.toDate()
@@ -69,7 +70,7 @@ export function useProApply() {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [enabled]);
 
     return { posts, loading };
 }
