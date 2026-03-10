@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 
 export interface ProApplyPost {
     id: string;
@@ -34,7 +34,12 @@ export function useProApply() {
 
     useEffect(() => {
         setLoading(true);
-        const q = collection(db, 'proApply');
+        // Optimize: Limit to recent 50 posts to reduce Firestore read costs
+        const q = query(
+            collection(db, 'proApply'),
+            orderBy('createdAt', 'desc'),
+            limit(50)
+        );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedPosts = snapshot.docs.map(doc => {

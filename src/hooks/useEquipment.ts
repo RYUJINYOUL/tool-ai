@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 
 export interface Equipment {
     id: string;
@@ -33,7 +33,12 @@ export function useEquipment() {
 
     useEffect(() => {
         setLoading(true);
-        const q = collection(db, 'equipment');
+        // Optimize: Limit to recent 50 equipment entries to reduce Firestore costs
+        const q = query(
+            collection(db, 'equipment'),
+            orderBy('createdDate', 'desc'),
+            limit(50)
+        );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedEquipment = snapshot.docs.map(doc => {

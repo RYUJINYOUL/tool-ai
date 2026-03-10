@@ -44,6 +44,12 @@ const CITY_TO_PROVINCE_MAP: Record<string, string> = {
     '남해': '경남', '하동': '경남', '산청': '경남', '함양': '경남', '합천': '경남'
 };
 
+const SEOUL_DISTRICTS = [
+    '강남', '강동', '강북', '강서', '관악', '광진', '구로', '금천', '노원', '도봉',
+    '동대문', '동작', '마포', '서대문', '서초', '성동', '성북', '송파', '양천', '영등포',
+    '용산', '은평', '종로', '중구', '중랑'
+];
+
 export default function NoticeBoard() {
     const [isNoticeOpen, setIsNoticeOpen] = useState(false);
     const [expandedNoticeIds, setExpandedNoticeIds] = useState<Set<string>>(new Set());
@@ -216,52 +222,82 @@ export default function NoticeBoard() {
         setShowAiModal(true); // Open modal immediately when search starts
 
         try {
-            // Refined Context: Prioritize items that match query keywords
-            const queryKeywords = queryText.split(' ').filter(k => k.length > 1);
+            // Intelligent Data Router Logic
+            const queryKeywords = queryText.split(' ').filter(k => k.length > 0);
 
-            const findMatches = (list: any[]) => {
-                // Prioritize company/title matches, then address/content. Added null checks to avoid toLowerCase errors.
-                return list.sort((a, b) => {
-                    const aText = `${a.title || ''} ${a.company || ''}`.toLowerCase();
-                    const bText = `${b.title || ''} ${b.company || ''}`.toLowerCase();
+            // 1. 지역 추출 (시/군/구 + 사전 기반 매칭)
+            const regionRegex = /([가-힣]+(?:시|군|구))/g;
+            let extractedRegions: string[] = queryText.match(regionRegex) || [];
 
-                    const aMatch = queryKeywords.some(k => aText.includes(k.toLowerCase()));
-                    const bMatch = queryKeywords.some(k => bText.includes(k.toLowerCase()));
+            // 사전 기반 추가 추출 (구가 빠진 경우 대비: 예: '강남', '수원')
+            const regionDict = [...SEOUL_DISTRICTS, ...Object.keys(CITY_TO_PROVINCE_MAP)];
+            regionDict.forEach(region => {
+                if (queryText.includes(region)) {
+                    // 이미 정규식으로 '강남구' 등이 잡혔으면 중복 추가 방지
+                    const isAlreadyCaptured = extractedRegions.some(er => er.includes(region));
+                    if (!isAlreadyCaptured) {
+                        extractedRegions.push(region);
+                    }
+                }
+            });
 
-                    if (aMatch && !bMatch) return -1;
-                    if (!aMatch && bMatch) return 1;
-                    return 0;
-                }).filter(item => {
-                    const searchStr = `${item.title || ''} ${item.company || ''} ${item.content || ''} ${item.deliverAddress || ''} ${item.address || ''} ${item.category || ''}`.toLowerCase();
-                    return queryKeywords.some(k => searchStr.includes(k.toLowerCase()));
+            // 2. 키워드별 가중치 설정
+            const hasIncomeQuery = queryText.includes('수익') || queryText.includes('원 이상') || queryText.includes('급여');
+            const keywordList = ["백업", "야간", "오네", "지게차"];
+            const conditionList = ["주말", "편한", "출퇴근"];
+
+            const scoredData = proApplyPosts.map(item => {
+                let score = 0;
+                const itemText = `${item.title || ''} ${item.company || ''} ${item.content || ''} ${item.deliverAddress || ''} ${item.address || ''}`.toLowerCase();
+
+                // 지역 일치 가중치 (매우 높음)
+                if (extractedRegions.length > 0) {
+                    const matchRegion = extractedRegions.some(r => itemText.includes(r.toLowerCase()));
+                    if (matchRegion) score += 100;
+                }
+
+                // 키워드 일치 가중치
+                queryKeywords.forEach(k => {
+                    if (itemText.includes(k.toLowerCase())) score += 10;
                 });
-            };
 
-            const matchedProApply = findMatches(proApplyPosts);
+                // 특정 조건 가중치 (수익)
+                if (hasIncomeQuery && item.monthlyIncome) score += 20;
 
-            // Combine keyword matches and recent items for proApply collection only
-            // Increased to 100 to cover more geographical areas, deduplicated by ID
-            const contextProApply = Array.from(
-                new Map([...matchedProApply, ...proApplyPosts].map(item => [item.id, item])).values()
-            ).slice(0, 100);
+                // 상세 키워드 검색 (백업, 야간 등)
+                keywordList.forEach(k => {
+                    if (queryText.includes(k) && (item.content || '').includes(k)) score += 15;
+                });
 
-            const context = [
-                ...contextProApply.map(p => ({
-                    id: p.id,
-                    type: '[택배구인]',
-                    title: p.title,
-                    company: p.company || p.category,
-                    location: p.deliverAddress || p.address,
-                    income_manwon: p.monthlyIncome,
-                    workTime: p.workTime,
-                    volume: p.totalVolume,
-                    date: p.createdAt instanceof Date ? p.createdAt.toISOString().split('T')[0] : 'N/A',
-                    details: p.content // Add full content for deeper analysis
-                }))
-            ];
+                // 근무 조건 검색 (주말, 편한 등)
+                conditionList.forEach(k => {
+                    if (queryText.includes(k) && ((item.workTime || '').includes(k) || (item.holiday || '').includes(k))) score += 15;
+                });
+
+                return { ...item, _score: score };
+            });
+
+            // 3. 점수 순으로 정렬 후 상위 10개 추출
+            const contextProApply = scoredData
+                .filter(item => item._score > 0 || extractedRegions.length === 0) // 지역이 특정되었을 때는 점수 있는 것만, 아니면 전체에서 상위
+                .sort((a, b) => b._score - a._score)
+                .slice(0, 10);
+
+            const context = contextProApply.map(p => ({
+                id: p.id,
+                type: '[택배구인]',
+                title: p.title,
+                company: p.company || p.category,
+                location: p.deliverAddress || p.address,
+                income_manwon: p.monthlyIncome,
+                workTime: p.workTime,
+                volume: p.totalVolume,
+                date: p.createdAt instanceof Date ? p.createdAt.toISOString().split('T')[0] : 'N/A',
+                details: p.content // 상세 분석을 위해 내용 유지
+            }));
 
             console.log("보내는 쿼리:", queryText);
-            console.log("AI Search Context Size:", context.length, "Matched:", matchedProApply.length);
+            console.log("AI Search Context Size:", context.length);
             if (context.length > 0) {
                 console.log("첫 번째 컨텍스트 샘플:", context[0]);
             }
@@ -1002,16 +1038,16 @@ function AISearchBar({ onSearch, isSearching, initialValue }: { onSearch: (q: st
             </div>
             <input
                 type="text"
-                placeholder="3월 12일까지 AI검색 점검 중입니다"
+                placeholder="**시 수익 높은 일자리 추천 (예: 강남구 야간 배송)"
                 value={localQuery}
                 onChange={(e) => setLocalQuery(e.target.value)}
-                disabled={true}
-                className="w-full pl-12 pr-12 py-3.5 bg-gray-100 border border-gray-200 rounded-2xl text-[15px] outline-none cursor-not-allowed opacity-70"
+                disabled={isSearching}
+                className="w-full pl-12 pr-12 py-3.5 bg-gray-100 border border-gray-200 rounded-2xl text-[15px] outline-none transition-all focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
             />
             <button
                 type="submit"
-                disabled={true}
-                className="absolute right-3 p-2 bg-gray-200 text-gray-400 rounded-xl cursor-not-allowed transition-colors"
+                disabled={isSearching}
+                className={`absolute right-3 p-2 rounded-xl transition-all ${localQuery.trim() ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-gray-200 text-gray-400'}`}
             >
                 <Search className="w-5 h-5" />
             </button>

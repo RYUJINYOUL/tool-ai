@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Notice } from '@/types/home';
 
 export function useNotices() {
@@ -11,7 +11,12 @@ export function useNotices() {
 
     useEffect(() => {
         setIsNoticesLoading(true);
-        const q = collection(db, 'community');
+        // Optimize: Limit to recent 100 community posts to reduce Firestore read costs
+        const q = query(
+            collection(db, 'community'),
+            orderBy('createdAt', 'desc'),
+            limit(100)
+        );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedNotices: Notice[] = [];
