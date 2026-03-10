@@ -35,19 +35,21 @@ export function useProApply() {
     useEffect(() => {
         setLoading(true);
         // Optimize: Limit to recent 50 posts to reduce Firestore read costs
+        // Note: Using 'createdDate' because it's the primary field in our python-uploaded data
         const q = query(
             collection(db, 'proApply'),
-            orderBy('createdAt', 'desc'),
+            orderBy('createdDate', 'desc'),
             limit(50)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedPosts = snapshot.docs.map(doc => {
                 const data = doc.data();
-                // Normalize date to standard JS Date
-                const createdAt = data.createdAt instanceof Timestamp
-                    ? data.createdAt.toDate()
-                    : (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : new Date());
+                // Normalize date: Check multiple fields to ensure we get a valid creation date
+                const rawDate = data.createdDate || data.pushTime || data.uploadedAt || data.createdAt;
+                const createdAt = rawDate instanceof Timestamp
+                    ? rawDate.toDate()
+                    : (rawDate?.seconds ? new Date(rawDate.seconds * 1000) : new Date());
 
                 return {
                     id: doc.id,
@@ -56,7 +58,7 @@ export function useProApply() {
                 } as ProApplyPost;
             });
 
-            // Client-side sorting to avoid Firestore Index requirements
+            // Client-side sorting for robustness
             fetchedPosts.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 
             setPosts(fetchedPosts);

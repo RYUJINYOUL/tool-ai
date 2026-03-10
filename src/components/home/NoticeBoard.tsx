@@ -9,7 +9,7 @@ import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, Timestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, Timestamp, deleteDoc, doc, getCountFromServer } from 'firebase/firestore';
 
 /** Smart Region Mapping: City -> Province */
 const CITY_TO_PROVINCE_MAP: Record<string, string> = {
@@ -89,7 +89,25 @@ export default function NoticeBoard() {
     const [regionSearch, setRegionSearch] = useState('');
     const [aiTimeline, setAiTimeline] = useState<any[]>([]);
     const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
+    const [totalProCount, setTotalProCount] = useState(0);
+    const [totalEquipCount, setTotalEquipCount] = useState(0);
     const noticeScrollRef = useRef<HTMLDivElement | null>(null);
+
+    /** Fetch Total Counts for UI Header */
+    useEffect(() => {
+        const fetchCounts = async () => {
+            try {
+                // Efficiently get counts without loading all documents
+                const proSnap = await getCountFromServer(collection(db, 'proApply'));
+                setTotalProCount(proSnap.data().count);
+                const equipSnap = await getCountFromServer(collection(db, 'equipment'));
+                setTotalEquipCount(equipSnap.data().count);
+            } catch (error) {
+                console.error('Error fetching total counts:', error);
+            }
+        };
+        fetchCounts();
+    }, []);
 
     const NOTICE_SCROLL_KEY = 'noticeBoardScrollTop';
     const NOTICE_STATE_KEY = 'noticeBoardRestoreState';
@@ -511,8 +529,14 @@ export default function NoticeBoard() {
                                         : <Truck className="w-4 h-4 text-blue-500 shrink-0" />
                                     }
                                     <span className="truncate">
-                                        {isFilterActive || regionSearch ? '검색된' : '현재'} {activeTab === '택배구인' ? '택배 일자리' : '용차 정보'} {
+                                        {isFilterActive || regionSearch ? '검색된' : '전체'} {activeTab === '택배구인' ? '택배 일자리' : '용차 정보'} {
                                             (() => {
+                                                // If no filters are active, show the real total count from server
+                                                if (!isFilterActive && !regionSearch.trim()) {
+                                                    return activeTab === '택배구인' ? totalProCount : totalEquipCount;
+                                                }
+
+                                                // If filtering is active, calculate from current dataSet
                                                 let dataSet = [];
                                                 if (activeTab === '택배구인') {
                                                     dataSet = Array.from(new Map([...proApplyPosts, ...notices.filter(n => n.categoryName === '택배구인' || n.categoryName === '구인구직')].map(item => [item.id, item])).values());
