@@ -301,7 +301,7 @@ export default function NoticeBoard() {
             const contextProApply = scoredData
                 .filter(item => item._score > 0 || extractedRegions.length === 0) // 지역이 특정되었을 때는 점수 있는 것만, 아니면 전체에서 상위
                 .sort((a, b) => b._score - a._score)
-                .slice(0, 10);
+                .slice(0, 25);
 
             const context = contextProApply.map(p => ({
                 id: p.id,
@@ -333,12 +333,12 @@ export default function NoticeBoard() {
                 setAiResult(data.answer);
 
                 // Extract IDs for filtering the main list
-                const idRegex = /(?:\[ID:|ID:|\(ID:)\s*([a-zA-Z0-9_-]{20,})[\]\)]?/g;
+                const idRegex = /(?:\[ID:|ID:|\(ID:)\s*([a-zA-Z0-9_-]{4,})[\]\)]?/g;
                 const matches = data.answer.match(idRegex);
                 let extractedIds: string[] = [];
                 if (matches) {
                     extractedIds = Array.from(new Set(matches.map((m: string) => {
-                        const innerMatch = m.match(/[a-zA-Z0-9_-]{20,}/);
+                        const innerMatch = m.match(/[a-zA-Z0-9_-]{4,}/);
                         return innerMatch ? innerMatch[0] : null;
                     }).filter(Boolean))) as string[];
 
@@ -1090,11 +1090,11 @@ function AISearchResultModal({ isOpen, onClose, isSearching, result, totalCount 
 }) {
     if (!isOpen) return null;
 
-    const idRegex = /(?:\[ID:|ID:|\(ID:)\s*([a-zA-Z0-9_-]{20,})[\]\)]?/g;
+    const idRegex = /(?:\[ID:|ID:|\(ID:)\s*([a-zA-Z0-9_-]{4,})[\]\)]?/g;
     const idMatches = result?.match(idRegex);
 
     const uniqueIds = Array.from(new Set(idMatches?.map(m => {
-        const innerMatch = m.match(/[a-zA-Z0-9_-]{20,}/);
+        const innerMatch = m.match(/[a-zA-Z0-9_-]{4,}/);
         return innerMatch ? innerMatch[0] : null;
     }).filter(Boolean)));
 
